@@ -10,11 +10,13 @@ GroundSurf is an independent, non-commercial online service. This experimental Q
 
 ## Generate your first report
 
-Search for an address, choose a result and check its location on the map. For Poland the report language defaults to Polski. A cross marks the address. Use an official parcel, a selected polygon feature or **Narysuj granicę**. Click the corners, then double-click the final corner. Choose **Generuj raport GroundSurf**. The site outline stays on the map. The form folds away and the report appears in the dock.
+Search for an address, choose a result and check its position on the map. A cross marks the address. Select an official parcel, use an existing polygon feature, or click **Draw a site**. For a drawn polygon, click its corners, then double-click the final corner. Select **Generate GroundSurf report**. The site outline remains on the map; the selection form folds away and the report appears in the dock.
 
-**Wybór lokalizacji** expands the form again. Under **Mapy i zapisane raporty**, use the parcel tools, address-radius screening, Polish map layers or a saved report. The map-layer action contacts the named map provider when you choose a layer. Existing project layers keep their original styles.
+Select **Site selection** to expand the form again. Under **Maps and saved reports**, you can access parcel tools, address-radius screening, available map layers and saved reports. Choosing a map layer contacts its named provider. Existing QGIS project layers keep their original styles.
 
-Open **Raport szczegółowy** to search every returned evidence record, view sources and limitations, inspect the stored record, ask a question, or save JSON or PDF. **Pokaż dane na mapie** maps supported source positions. A distance from the site alone cannot locate an observation. The Polish monitoring mapper looks up the recorded station ID and checks its monitoring reference. Follow-up questions use the active report. Source pages, copying a share link and copying an embed are explicit actions.
+Choose **Detailed report** to search the evidence, check sources and limitations, inspect the stored record, ask follow-up questions, or save JSON or PDF. **Show evidence on map** maps supported source positions, not estimated locations. A distance from the site alone is insufficient to place an observation. Where available, the Polish groundwater monitoring integration identifies the recorded station and verifies its reference. Sharing and copying an embed are explicit user actions.
+
+**Language:** The plugin displays translated button labels when you select a supported report language. For example, **Draw a site** appears as **Narysuj granicę** in Polish, and **Detailed report** as **Raport szczegółowy**. For sites in Poland the default report language is Polish; you can change it.
 
 ## GroundSurf website → QGIS → optional 3D
 
