@@ -4,7 +4,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 You may redistribute and modify this plugin under the GNU General Public
 License, version 2 or (at your option) any later version. It is distributed
-without warranty. See LICENSE.txt for the terms.
+without warranty. See LICENSE for the terms.
 
 This grant covers the GroundSurf plugin and its bundled GroundSurf exporter.
 The separately hosted GroundSurf service, source datasets and provider maps

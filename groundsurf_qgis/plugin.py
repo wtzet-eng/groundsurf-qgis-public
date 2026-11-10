@@ -703,7 +703,7 @@ class GroundSurfPlugin(ReportActions):
         request = QNetworkRequest(QUrl(API_URL+"?progressStream=1"))
         request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json; charset=utf-8")
         request.setRawHeader(b"Accept", b"text/event-stream")
-        request.setRawHeader(b"User-Agent", b"GroundSurf-QGIS/0.3.1")
+        request.setRawHeader(b"User-Agent", b"GroundSurf-QGIS/0.3.2")
         request.setTransferTimeout(210000)
         self._timed_out = False
         self._cancelled = False
@@ -759,7 +759,7 @@ class GroundSurfPlugin(ReportActions):
             self._reply.abort()
 
     def _failure(self, message):
-        self.progress.setText(self.tr2("Report unavailable","Raport niedostępny") + " · 0.3.1 · " + message)
+        self.progress.setText(self.tr2("Report unavailable","Raport niedostępny") + " · 0.3.2 · " + message)
         if self.language.currentData() == "pl":
             self.report_text.setPlainText("Raport nie został wygenerowany.\n\n"+message+"\n\nMożesz ponowić próbę dla tej samej lokalizacji.")
             return
@@ -835,7 +835,7 @@ class GroundSurfPlugin(ReportActions):
             data["qgis_site_kind"] = self._submitted_kind
             self.display(data)
             self.remember(data)
-            self.progress.setText(self.tr2("Report ready","Raport gotowy")+" · 0.3.1 · HTTP %s · %s" % (status,data["id"]))
+            self.progress.setText(self.tr2("Report ready","Raport gotowy")+" · 0.3.2 · HTTP %s · %s" % (status,data["id"]))
             self.request_interpretation()
         except ValueError as exc:
             self._failure(str(exc))

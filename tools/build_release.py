@@ -14,9 +14,11 @@ version = next(
 TARGET = OUT / ("GroundSurf-QGIS-" + version + ".zip")
 with ZipFile(TARGET, "w", ZIP_DEFLATED) as package:
     for file in sorted(PLUGIN.iterdir()):
-        if file.is_file() and file.suffix in (".py", ".txt", ".md", ".js"):
+        if file.is_file() and (file.name == "LICENSE" or file.suffix in (".py", ".txt", ".md", ".js")):
             package.write(file, "groundsurf_qgis/" + file.name)
 with ZipFile(TARGET) as package:
+    if package.read("groundsurf_qgis/LICENSE") != (PLUGIN / "LICENSE").read_bytes():
+        raise ValueError("Packaged LICENSE differs from the source licence")
     assert package.testzip() is None
     assert "groundsurf_qgis/metadata.txt" in package.namelist()
     assert "groundsurf_qgis/__init__.py" in package.namelist()

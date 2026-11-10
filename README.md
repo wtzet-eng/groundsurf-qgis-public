@@ -1,11 +1,11 @@
-# GroundSurf for QGIS 0.3.1
+# GroundSurf for QGIS 0.3.2
 
 GroundSurf is an independent, non-commercial online service. This experimental QGIS 3 plugin uses the same hosted evidence engine as the website.
 
 ## Install or upgrade
 
 1. Open **Plugins → Manage and Install Plugins → Install from ZIP**.
-2. Select **GroundSurf-QGIS-0.3.1.zip**. Enable **GroundSurf – Site Intelligence** in the Installed tab.
+2. Select **GroundSurf-QGIS-0.3.2.zip**. Enable **GroundSurf – Site Intelligence** in the Installed tab.
 3. Open **Plugins → GroundSurf**. If an older dock remains open after upgrading, restart QGIS. Existing project layers and the explicit report-language preference are retained.
 
 ## Generate your first report
@@ -47,7 +47,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 You may redistribute and modify this plugin under the GNU General Public
 License, version 2 or (at your option) any later version. It is distributed
-without warranty. See [LICENSE.txt](groundsurf_qgis/LICENSE.txt) for the terms.
+without warranty. See [LICENSE](groundsurf_qgis/LICENSE) for the terms.
 
 This grant covers the GroundSurf plugin and its bundled GroundSurf exporter.
 The separately hosted GroundSurf service, source datasets and provider maps
