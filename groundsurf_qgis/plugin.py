@@ -298,6 +298,21 @@ class GroundSurfPlugin(ReportActions):
         self.open_button.clicked.connect(self.open_report)
         layout.addWidget(self.open_button)
 
+        handoff = QHBoxLayout()
+        self.web_report_button = QPushButton("Open web report")
+        self.web_report_button.setToolTip("Paste a GroundSurf website report link or report ID")
+        self.web_report_button.clicked.connect(self.open_web_report)
+        handoff.addWidget(self.web_report_button)
+        self.show_qgis_button = QPushButton("Display in QGIS")
+        self.show_qgis_button.setToolTip("Make a site boundary layer and map positioned evidence")
+        self.show_qgis_button.clicked.connect(self.show_in_qgis)
+        handoff.addWidget(self.show_qgis_button)
+        self.explore_3d_button = QPushButton("Explore in 3D")
+        self.explore_3d_button.setToolTip("Optional: send visible QGIS layers to Current View to ParaView")
+        self.explore_3d_button.clicked.connect(self.explore_3d)
+        handoff.addWidget(self.explore_3d_button)
+        layout.addLayout(handoff)
+
         from qgis.PyQt.QtWidgets import QMenu, QToolButton
         self.tools_button = QToolButton()
         self.tools_button.setPopupMode(QToolButton.InstantPopup)
@@ -310,7 +325,11 @@ class GroundSurfPlugin(ReportActions):
                         (self.site_toggle,"Site selection","Wybór lokalizacji"),(selected,"Use selected polygon","Użyj zaznaczonego poligonu"),(draw,"Draw a site","Narysuj granicę"),
                         (self.search_button,"Search","Szukaj"),(self.use_site_language_button,"Use site language","Język kraju"),
                         (self.analyze_button,"Generate GroundSurf report","Generuj raport GroundSurf"),(self.cancel_button,"Cancel request","Anuluj"),
-                        (self.open_button,"Detailed report","Raport szczegółowy"),(self.tools_button,"Maps and saved reports","Mapy i zapisane raporty")]
+                        (self.open_button,"Detailed report","Raport szczegółowy"),
+                        (self.web_report_button,"Open web report","Otwórz raport online"),
+                        (self.show_qgis_button,"Display in QGIS","Pokaż w QGIS"),
+                        (self.explore_3d_button,"Explore in 3D","Otwórz w 3D"),
+                        (self.tools_button,"Maps and saved reports","Mapy i zapisane raporty")]
         self._translate()
         self.dock.visibilityChanged.connect(self._visibility)
         self.iface.mapCanvas().destinationCrsChanged.connect(self._refresh_outline)

@@ -5,7 +5,7 @@ from groundsurf_qgis.core import (
     MAX_VERTICES, COUNTRIES, COUNTRY_LANGUAGE, LANGUAGES,
     available_languages, format_report_text, geocoder_search_url,
     normalize_ring_latlon, parse_geocoder_results,
-    preferred_language, report_url, request_payload,
+    preferred_language, report_id_from_input, report_url, request_payload,
 )
 
 RING = [(52.0, 13.0), (52.001, 13.0), (52.001, 13.002), (52.0, 13.0)]
@@ -119,6 +119,30 @@ class GroundSurfCoreTests(unittest.TestCase):
 
     def test_report_link(self):
         self.assertEqual(report_url({"id": "REP-DE-TEST123"}), "https://groundsurf.net/report?report_id=REP-DE-TEST123")
+
+    def test_website_report_link_or_id_for_qgis(self):
+        rid = "REP-DE-QA12345"
+        self.assertEqual(report_id_from_input(rid), rid)
+        self.assertEqual(report_id_from_input(
+            "https://groundsurf.net/report?report_id=" + rid), rid)
+        self.assertEqual(report_id_from_input(
+            "https://www.groundsurf.net/report?country=DE&lang=pl&report_id=" + rid), rid)
+
+    def test_website_handoff_rejects_non_groundsurf_and_ambiguous_links(self):
+        rid = "REP-DE-QA12345"
+        for value in (
+            "http://groundsurf.net/report?report_id=" + rid,
+            "https://groundsurf.net.evil.org/report?report_id=" + rid,
+            "https://groundsurf.net@evil.org/report?report_id=" + rid,
+            "https://groundsurf.net/other?report_id=" + rid,
+            "https://groundsurf.net/report?report_id=" + rid + "&report_id=OTHER",
+            "https://groundsurf.net/report?report_id=",
+            "javascript:alert(1)",
+            "REP-DE-123/../../api",
+            "A" * 1300,
+        ):
+            with self.subTest(value=value[:60]):
+                self.assertEqual(report_id_from_input(value), "")
 
     def test_suspicious_report_id_is_rejected(self):
         self.assertEqual(report_url({"id": "x&other=evil"}), "")

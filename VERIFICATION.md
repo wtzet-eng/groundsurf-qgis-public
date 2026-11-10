@@ -1,3 +1,38 @@
+# Release verification · 0.3.3 · GroundSurf website → QGIS → ParaView
+
+Tested 10 November 2026 on Ubuntu 24.04.5 LTS with QGIS 3.34.4 and ParaView 6.2.0.
+
+**New, optional workflow:** Copy the link to a stored GroundSurf report; use
+**Open web report** in the GroundSurf QGIS dock; choose **Display in QGIS** to
+map the saved site polygon and positioned evidence; choose **Explore in 3D**
+when Current View to ParaView is installed and enabled.
+
+The two plugins remain independent. The 3D view uses actual eligible local
+QGIS layers only, not estimated or invented borehole/geology geometries.
+Nonspatial claims remain in the report. An off-site observation retains its
+actual observed location. The site boundary is a memory layer with a spatial
+index and documented origin; the evidence memory layer now also has an index.
+
+**Automated checks:** 34 pure-Python unit tests; existing QGIS UI, network and
+report lifecycle regression smokes; new offline report-link/map-layer/optional
+plugin handoff test; and an end-to-end test invoking the actual Current View
+to ParaView 0.1.4 exporter. The latter exported the site polygon and evidence
+point to separate VTP blocks, with a scene.vtm, and passed a detached-process
+environment smoke. ParaView 6.2.0 pvpython opened the generated scene (7 points,
+3 cells). No live public GroundSurf API or external evidence provider was queried
+by the new tests.
+
+**Packaging checks:** 0.3.3 ZIP contains 12 runtime files, including the
+extensionless GPL-2.0-or-later LICENSE. Extracted ZIP scanned with Bandit
+(0 findings) and detect-secrets (0 findings). ZIP CRC and Python syntax passed.
+
+**Not yet verified:** installation and user interaction with 0.3.3 in the
+existing QGIS desktop profile; website-side 'Explore in QGIS' button; Windows
+and macOS; every real country/provider; auto-generating 3D surfaces from report
+prose. Publication to the QGIS repository should follow user acceptance.
+
+---
+
 # Release verification · 9 November 2026
 
 **Package** GroundSurf-QGIS-0.3.0.zip, 76,828 bytes  
