@@ -3,12 +3,14 @@ import json
 from urllib.parse import urlencode
 from pathlib import Path
 
-from qgis.PyQt.QtCore import Qt, QUrl, QSaveFile, QIODevice, QVariant
+from qgis.PyQt.QtCore import Qt, QUrl, QSaveFile, QIODevice, QVariant, QTimer
 from qgis.PyQt.QtNetwork import QNetworkRequest, QNetworkReply
-from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QInputDialog
+from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
 from qgis.core import (QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsFeature,
-    QgsField, QgsGeometry, QgsNetworkAccessManager, QgsPointXY, QgsProject, QgsVectorLayer)
-from .core import API_BASE, MAX_RESPONSE_BYTES, normalize_ring_latlon, report_url
+    QgsField, QgsFillSymbol, QgsGeometry, QgsNetworkAccessManager, QgsPointXY, QgsProject,
+    QgsVectorLayer, QgsWkbTypes)
+from .core import (API_BASE, MAX_RESPONSE_BYTES, normalize_ring_latlon,
+                   report_id_from_input, report_url)
 from .report_view import ReportWindow, summary
 
 
@@ -213,6 +215,127 @@ class ReportActions:
             self.progress.setText(self.tr2("Share link copied.","Skopiowano link."))
         self.service("share","/api/reports/"+rid+"/share",{},copy)
 
+    def open_web_report(self):
+        """Import a saved GroundSurf website report without altering the web app."""
+        clipboard = QApplication.clipboard().text().strip()
+        proposed = clipboard if report_id_from_input(clipboard) else ""
+        entered, accepted = QInputDialog.getText(
+            self.dock, self.tr2("Open GroundSurf report in QGIS", "Otwórz raport GroundSurf w QGIS"),
+            self.tr2("Paste a GroundSurf report link or report ID:",
+                     "Wklej link do raportu GroundSurf lub jego identyfikator:"),
+            text=proposed,
+        )
+        if not accepted:
+            return
+        rid = report_id_from_input(entered)
+        if not rid:
+            self.progress.setText(self.tr2(
+                "Use an HTTPS link from groundsurf.net/report or a valid report ID.",
+                "Podaj link HTTPS z groundsurf.net/report albo poprawny identyfikator raportu."))
+            return
+
+        def loaded(result):
+            if result.get("id") != rid:
+                raise ValueError("The service returned a different report ID.")
+            self.restore_record(result)
+            self.progress.setText(self.tr2(
+                "Website report opened in QGIS. Use Display in QGIS to add its available map evidence.",
+                "Raport strony otwarty w QGIS. Wybierz Pokaż w QGIS, by dodać dostępne dane mapowe."))
+
+        self.progress.setText(self.tr2("Opening saved report…", "Otwieranie zapisanego raportu…"))
+        self.service("open", "/api/reports/" + rid, None, loaded)
+
+    def _publish_selected_site(self):
+        """Add the current footprint as a real, indexed QGIS layer (not a rubber band)."""
+        if self._geometry is None or self._geometry_crs is None:
+            return None
+        footprint = QgsGeometry(self._geometry)
+        if (footprint.isEmpty() or not self._geometry_crs.isValid()
+                or QgsWkbTypes.geometryType(footprint.wkbType()) != QgsWkbTypes.PolygonGeometry
+                or not footprint.isGeosValid()):
+            raise ValueError("The selected site is not a valid polygon.")
+        rid = self.report.get("id", "") if self.report else ""
+        identity = (rid, bytes(footprint.asWkb()))
+        previous = QgsProject.instance().mapLayer(getattr(self, "_site_export_layer_id", "") or "")
+        if previous and identity == getattr(self, "_site_export_identity", None):
+            return previous
+        label = "GroundSurf · site boundary" + (" · " + rid if rid else "")
+        layer = QgsVectorLayer("Polygon?crs=EPSG:4326", label, "memory")
+        if not layer.isValid():
+            raise ValueError("Could not create the QGIS site layer.")
+        layer.setCrs(self._geometry_crs)
+        provider = layer.dataProvider()
+        provider.addAttributes([QgsField("report_id", QVariant.String),
+                                QgsField("site_origin", QVariant.String)])
+        layer.updateFields()
+        feature = QgsFeature(layer.fields())
+        feature.setGeometry(footprint)
+        feature.setAttributes([rid, str(self.site_kind)])
+        if not provider.addFeatures([feature])[0]:
+            raise ValueError("Could not add the site geometry to QGIS.")
+        provider.createSpatialIndex()
+        layer.updateExtents()
+        layer.renderer().setSymbol(QgsFillSymbol.createSimple({
+            "style": "no", "outline_style": "solid",
+            "outline_color": "25,105,159,255", "outline_width": "0.8",
+        }))
+        layer.setCustomProperty("GroundSurf/report_id", rid)
+        layer.setCustomProperty("GroundSurf/boundary_origin", str(self.site_kind))
+        QgsProject.instance().addMapLayer(layer)
+        self._site_export_layer_id = layer.id()
+        self._site_export_identity = identity
+        return layer
+
+    def show_in_qgis(self):
+        """Explicitly map the site and only evidence with defensible positions."""
+        if self.report is None and self._geometry is None:
+            self.progress.setText(self.tr2(
+                "Open a GroundSurf report or select a site first.",
+                "Najpierw otwórz raport GroundSurf albo wybierz obszar."))
+            return
+        try:
+            site = self._publish_selected_site()
+        except (ValueError, RuntimeError) as exc:
+            self.progress.setText(str(exc))
+            return
+        if self.report:
+            self.open_report()
+            self.map_evidence(self.reader)
+        elif site:
+            self.progress.setText(self.tr2(
+                "Site boundary added to QGIS. Generate a report to map located evidence.",
+                "Dodano granicę do QGIS. Wygeneruj raport, aby wyświetlić dane z lokalizacją."))
+        # Off-site observations are observations, never parcel-specific measurements.
+
+    def explore_3d(self):
+        """Hand off the QGIS canvas to the separate, optional ParaView plugin."""
+        if self._geometry is None:
+            self.progress.setText(self.tr2(
+                "Select a polygon site first. A report without a boundary cannot define a 3D site.",
+                "Najpierw wybierz granicę obszaru. Raport bez granicy nie określa terenu 3D."))
+            return
+        try:
+            from qgis.utils import plugins
+            pv = plugins.get("view_to_paraview")
+            if pv is None or not callable(getattr(pv, "send", None)):
+                QMessageBox.information(self.dock, self.tr2("Optional 3D plugin", "Opcjonalna wtyczka 3D"),
+                    self.tr2(
+                        "Install and enable 'Current View to ParaView' in QGIS to export the current map to 3D. "
+                        "Your GroundSurf report will remain available in QGIS.",
+                        "Zainstaluj i włącz w QGIS wtyczkę 'Current View to ParaView', aby wyeksportować mapę w 3D. "
+                        "Raport GroundSurf pozostanie dostępny w QGIS."))
+                return
+            self._publish_selected_site()
+            self.zoom_site()
+        except (ValueError, RuntimeError) as exc:
+            self.progress.setText(str(exc))
+            return
+        self.progress.setText(self.tr2(
+            "Opening the current QGIS map in 3D. Only eligible local layers within the view are exported.",
+            "Otwieranie mapy QGIS w 3D. Eksportowane są tylko obsługiwane warstwy lokalne w widoku."))
+        # Let QGIS update the canvas and layer tree before the 3D plugin freezes its snapshot.
+        QTimer.singleShot(0, pv.send)
+
     def polygon(self, points):
         ring = [QgsPointXY(lon,lat) for lat,lon in points]
         return QgsGeometry.fromPolygonXY([ring+[ring[0]]])
@@ -332,9 +455,9 @@ class ReportActions:
         provider.addAttributes([QgsField("record",QVariant.Int)]+[QgsField(k,QVariant.String) for k in fields])
         layer.updateFields()
         for i,item in enumerate(window.items):
-            value = item.get("value")
+            value = item.get("value") or {}
             if not isinstance(value,dict):
-                continue
+                value = {}
             if item.get("id")=="europe-eea-industrial-sites":
                 for site in value.get("sites",[]):
                     if isinstance(site,dict):
@@ -363,7 +486,14 @@ class ReportActions:
         if not features:
             window.detail.setPlainText(notice+" "+self.tr2("No supported source positions in these records.","Brak współrzędnych źródłowych w obsługiwanym formacie."))
             return
-        provider.addFeatures(features)
+        if not provider.addFeatures(features)[0]:
+            window.detail.setPlainText(self.tr2(
+                "Could not add the located evidence to QGIS.",
+                "Nie można dodać danych z lokalizacją do QGIS."))
+            return
+        # The optional 3D exporter requires an indexed local vector provider.
+        # Build it for this temporary layer rather than asking users to fix it.
+        provider.createSpatialIndex()
         layer.updateExtents()
         QgsProject.instance().addMapLayer(layer)
         self.layer_id = layer.id()

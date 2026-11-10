@@ -1,7 +1,7 @@
 """Pure Python: request schema and safe report formatting. No QGIS dependency."""
 import math
 import re
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, parse_qs
 
 API_BASE = "https://geosurvey-backend-5yz2avrqwa-ew.a.run.app"
 API_URL = API_BASE + "/api/analyze-site"
@@ -178,6 +178,29 @@ def request_payload(points_latlon, area_m2, country_code, language):
         raise ValueError("Select a supported report language.")
     return {"shape": {"type": "polygon", "points": normalize_ring_latlon(points_latlon)},
             "areaSize": round(area, 2), "countryCode": country, "language": lang}
+
+def report_id_from_input(value):
+    """Accept a GroundSurf report ID or the canonical HTTPS report URL only."""
+    text = str(value or "").strip()
+    if not text or len(text) > 1200:
+        return ""
+    if "://" in text:
+        try:
+            url = urlsplit(text)
+            if (url.scheme != "https" or url.hostname not in
+                    ("groundsurf.net", "www.groundsurf.net")
+                    or url.port is not None or url.username is not None
+                    or url.password is not None or url.path != "/report"):
+                return ""
+            params = parse_qs(url.query, keep_blank_values=True)
+            identifiers = params.get("report_id", [])
+            if len(identifiers) != 1:
+                return ""
+            text = identifiers[0]
+        except ValueError:
+            return ""
+    return text if report_url({"id": text}) else ""
+
 
 def report_url(report):
     value = report.get("id") if isinstance(report, dict) else None
