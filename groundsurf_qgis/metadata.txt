@@ -1,0 +1,18 @@
+[general]
+name=GroundSurf - Site Intelligence
+qgisMinimumVersion=3.28
+version=0.3.1
+description=Assess selected ground conditions using the online GroundSurf evidence engine.
+about=Independent non-commercial GroundSurf screening. Search via Photon, choose a site and request online evidence from the GroundSurf Cloud Run service. Read, map, query, save and share reports in QGIS. A source layer or map export can contact the named external provider. Internet required for new analysis.
+author=GroundSurf
+email=tzuk.ls@outlook.com
+homepage=https://groundsurf.net
+category=Web
+tags=groundwater,geology,land,ground conditions,site intelligence
+experimental=True
+deprecated=False
+
+repository=https://github.com/wtzet-eng/groundsurf-qgis-public
+tracker=https://github.com/wtzet-eng/groundsurf-qgis-public/issues
+
+license=GPL-2.0-or-later

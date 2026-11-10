@@ -1,0 +1,11 @@
+GroundSurf for QGIS
+Copyright (C) 2026 Tomasz Żuk, for the GroundSurf plugin original work.
+SPDX-License-Identifier: GPL-2.0-or-later
+
+You may redistribute and modify this plugin under the GNU General Public
+License, version 2 or (at your option) any later version. It is distributed
+without warranty. See LICENSE.txt for the terms.
+
+This grant covers the GroundSurf plugin and its bundled GroundSurf exporter.
+The separately hosted GroundSurf service, source datasets and provider maps
+are outside its scope. Third-party JavaScript helpers retain their notices.
