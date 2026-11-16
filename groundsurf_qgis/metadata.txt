@@ -4,6 +4,9 @@ qgisMinimumVersion=3.28
 version=0.3.2
 description=Assess selected ground conditions using the online GroundSurf evidence engine.
 about=Independent non-commercial GroundSurf screening. Search via Photon, choose a site and request online evidence from the GroundSurf Cloud Run service. Read, map, query, save and share reports in QGIS. A source layer or map export can contact the named external provider. Internet required for new analysis.
+    GroundSurf video. Select a site and explore its ground evidence in QGIS. https://youtu.be/o8NiUfYtFVM
+    Optional 3D workflow. Display GroundSurf evidence alongside mapped geology and seismic profiles. This video demonstrates Current View to ParaView and SeisPlotPy. https://youtu.be/eWNIJKgonms
+    Optional geostatistics. Use SGeMS Workbench with prepared well measurements to explore groundwater surfaces with kriging and simulation. https://github.com/wtzet-eng/sgems-workbench
 author=GroundSurf
 email=tzuk.ls@outlook.com
 homepage=https://groundsurf.net

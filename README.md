@@ -2,6 +2,12 @@
 
 GroundSurf is an independent, non-commercial online service. This experimental QGIS 3 plugin uses the same hosted evidence engine as the website.
 
+## Videos and companion plugins
+
+- **Start with GroundSurf.** See how site selection and ground evidence support a conceptual model for land evaluation in QGIS. [Watch the GroundSurf walkthrough](https://youtu.be/o8NiUfYtFVM).
+- **Explore the site in 3D.** Once GroundSurf evidence is on the QGIS map, add your geological layers or positioned seismic profiles. Current View to ParaView exports the visible layers for inspection in 3D. The video demonstrates this workflow with SeisPlotPy. [Watch the seismic and mapping demo](https://youtu.be/eWNIJKgonms) · [Current View to ParaView](https://github.com/wtzet-eng/current-view-to-paraview).
+- **Model groundwater locally.** If you have a projected well-point layer with water elevations from the same aquifer and a common height datum, SGeMS Workbench can estimate a groundwater surface with ordinary kriging or simulate alternative surfaces. Its bundled modelling tools run on 64-bit Intel/AMD Linux. [SGeMS Workbench](https://github.com/wtzet-eng/sgems-workbench).
+
 ## Install or upgrade
 
 1. Open **Plugins → Manage and Install Plugins → Install from ZIP**.
