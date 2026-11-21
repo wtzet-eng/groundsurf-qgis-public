@@ -1,9 +1,10 @@
 [general]
 name=GroundSurf - Site Intelligence
 qgisMinimumVersion=3.28
-version=0.3.2
-description=Assess selected ground conditions using the online GroundSurf evidence engine.
-about=Independent non-commercial GroundSurf screening. Search via Photon, choose a site and request online evidence from the GroundSurf Cloud Run service. Read, map, query, save and share reports in QGIS. A source layer or map export can contact the named external provider. Internet required for new analysis.
+qgisMaximumVersion=3.99
+version=0.5.0
+description=Find a site on OpenStreetMap and explore its ground evidence in QGIS.
+about=Independent non-commercial GroundSurf screening. OpenStreetMap appears automatically in empty projects. Address suggestions via Photon help find a site and its official parcel where available. Read, map, query, save and share reports from the online GroundSurf evidence engine. Automatic map and search defaults can be turned off. A source layer or map export can contact the named external provider. Internet required for new analysis.
     GroundSurf video. Select a site and explore its ground evidence in QGIS. https://youtu.be/o8NiUfYtFVM
     Optional 3D workflow. Display GroundSurf evidence alongside mapped geology and seismic profiles. This video demonstrates Current View to ParaView and SeisPlotPy. https://youtu.be/eWNIJKgonms
     Optional geostatistics. Use SGeMS Workbench with prepared well measurements to explore groundwater surfaces with kriging and simulation. https://github.com/wtzet-eng/sgems-workbench
@@ -12,10 +13,17 @@ email=tzuk.ls@outlook.com
 homepage=https://groundsurf.net
 category=Web
 tags=groundwater,geology,land,ground conditions,site intelligence
-experimental=True
+experimental=False
 deprecated=False
 
 repository=https://github.com/wtzet-eng/groundsurf-qgis-public
 tracker=https://github.com/wtzet-eng/groundsurf-qgis-public/issues
 
 license=GPL-2.0-or-later
+changelog=0.5.0 - Simplify the dock with automatic OpenStreetMap, address suggestions, clearer site selection, a groundwater-first overview and a spacious native report reader. Retain full evidence, stored reports and optional companion plugins. GroundSurf Site Intelligence remains separate from GroundSurf Geothermal.
+    0.4.1 - Add tutorial videos and companion plugin resources.
+    0.4.0 - Add local Geotech groundwater-depth comparisons, concrete chemistry evidence and optional SGeMS Workbench integration.
+    0.3.6 - Fix the remaining Qt checker warnings for text and integer fields.
+    0.3.5 - Correct text and integer field type compatibility on older QGIS 3 versions.
+    0.3.4 - Update Qt enums for site selection, requests, saving and report display.
+    0.3.3 - Open website report links in QGIS, map selected site footprints, and optionally hand off the current view to the separate ParaView plugin.

@@ -1,5 +1,25 @@
 # Web and QGIS feature audit
 
+## 0.5.0 interface update · 21 November 2026
+
+The original web/API audit below is retained as a dated baseline. This update changes the native interface and defaults; it reuses the 0.4.1 evidence, parcel, report identity and export code. It is not a new audit of every currently deployed country adapter. GroundSurf Site Intelligence remains independent of GroundSurf Geothermal/Studio.
+
+| Action | 0.5.0 implementation | Acceptance |
+|---|---|---|
+| Open the plugin in an empty project | Automatic native OpenStreetMap XYZ layer, bottom of a dedicated group; visible attribution | Visible installed ZIP and fixture tests; default can be disabled; existing project CRS, layers, styles and extent preserved |
+| Type an address | 900 ms debounce, minimum three characters, request interval, memory cache, stale response suppression | Live Photon choices for Rynek Główny 1; fixture checks for timeout, cache, explicit selection and disabling suggestions |
+| Choose a precise address | Country and language update; official parcel lookup uses existing service | Polish selected automatically; live GUGiK / ULDK parcel 126105_9.0001.312 confirmed after an earlier HTTP 429; fallback retained |
+| Choose a boundary | Pick parcel and Draw boundary beside address search; explicit 50 m fallback; selected polygon in More | Visible polygon drawing and finish; projected/geographic payload and radius fixtures |
+| Generate and read | Form folds away; short groundwater overview; larger native reader with Interpretation and Evidence | Visible installed-ZIP Polish polygon: HTTP 200 in 35.2 s, REP-PL-MWQ3Q89Y, 30 records; cancel and retry confirmed |
+| Search all evidence | Source-oriented list, filter count, source details and linked map selection | Record 24 accessible; source text escaped; nonspatial data stays in report |
+| Save, reopen, ask and share | Existing APIs and stored identity; export menu in reader; recent/JSON/web reports in More | JSON, PDF, reopen, live Polish question and 18-field stored-report equality; fixture sharing; optional manifest runtime limitation documented |
+| Map services fail | Separate map status; concise parcel/service errors; selected site preserved | Map errors cannot overwrite report status; HTTP 429 observed in live test network |
+| Optional modelling tools | Existing Geotech and ParaView handoff remain optional | Handoff fixture passed; no Geothermal/Studio UI, dependency or shared project store added |
+
+See [0.5.0 release verification](docs/RELEASE-0.5.0.md) for exact coverage and blockers.
+
+## Original backend parity audit · November 2026
+
 Compared Geosurvey main `da296fb` with the deployed `/assets/index-Crby1XSY.js`. The Ubuntu web checkout at `726146e` differs from that commit only in the deployment workflow. The deployed bundle contains the Cloud Run base URL and the analysis, question and cadastre calls below. The health endpoint supplies status and time. An exact deployed Git SHA was unavailable.
 
 | User action | Reachable web entry / dependency | QGIS 0.3.0 equivalent and state | Acceptance or gap |

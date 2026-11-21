@@ -138,7 +138,9 @@ def main():
         assert plugin.open_button.isEnabled()
         assert module.QgsNetworkAccessManager.instance().timeout() == previous_timeout
         assert "Testowy raport geologiczny." in plugin.report_text.toPlainText()
-        assert "REQUIRES_VERIFICATION" in plugin.report_text.toPlainText()
+        assert "Do sprawdzenia" in plugin.report_text.toPlainText()
+        plugin.open_report()
+        assert "REQUIRES_VERIFICATION" in plugin.reader.detail.toPlainText()
         assert FakeService.payload["countryCode"] == "PL"
         assert FakeService.payload["language"] == "pl"
         assert FakeService.payload["areaSize"] > 0

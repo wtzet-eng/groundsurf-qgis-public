@@ -15,12 +15,13 @@ from groundsurf_qgis import plugin as mod
 from groundsurf_qgis.manifest import evidence_manifest
 
 
-def check(report, root, live):
+def check(report, root, live, allow_missing_manifest_runtime=False):
     mod.QgsSettings = FakeSettings
     p = mod.GroundSurfPlugin(FakeIface())
     p._create_panel()
     try:
         p.restore_record(report)
+        p.open_report()
         assert p.reader.list.count()==len(report["report_data"]["evidence_registry"])
         with patch("groundsurf_qgis.report_view.QFileDialog.getSaveFileName",return_value=(str(root/"site.pdf"),"")):
             p.reader.export_pdf()
@@ -31,9 +32,17 @@ def check(report, root, live):
         with patch("groundsurf_qgis.actions.QFileDialog.getOpenFileName",return_value=(str(root/"site.json"),"")):
             p.load_record()
         assert p.report==report
-        m=evidence_manifest(report,"pl","2026-11-09T00:00:00Z")
-        assert len(m["evidence"])==p.reader.list.count()
-        if os.environ.get("GROUNDSURF_QA_MANIFEST"):
+        p.open_report()
+        try:
+            m=evidence_manifest(report,"pl","2026-11-09T00:00:00Z")
+        except ValueError as exc:
+            if not allow_missing_manifest_runtime or "QtQml or QtWebKit" not in str(exc):
+                raise
+            m = None
+            print("SKIP manifest: this QGIS build has neither QtQml nor QtWebKit; clear error verified.")
+        if m is not None:
+            assert len(m["evidence"])==p.reader.list.count()
+        if m is not None and os.environ.get("GROUNDSURF_QA_MANIFEST"):
             Path(os.environ["GROUNDSURF_QA_MANIFEST"]).write_text(json.dumps(m))
         def share_fixture(key,path,body,done):
             assert path=="/api/reports/"+report["id"]+"/share"
@@ -55,7 +64,8 @@ def check(report, root, live):
                 matches = QgsProject.instance().mapLayersByName(name)
                 assert matches and matches[0].isValid(),name
                 print("QGIS provider valid:",name)
-        print("PASS: native reader, JSON save/open, PDF, manifest, share confirmation and embed clipboard.")
+        print("PASS: native reader, JSON save/open, PDF, share confirmation and embed clipboard." +
+              (" Manifest passed." if m is not None else " Manifest unavailable on this build."))
     finally:
         p.unload()
 
@@ -64,9 +74,10 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("report",type=Path)
     parser.add_argument("--live",action="store_true")
+    parser.add_argument("--allow-missing-manifest-runtime",action="store_true")
     args=parser.parse_args()
     app=QgsApplication([],False)
     app.initQgis()
     with TemporaryDirectory() as temp:
-        check(json.loads(args.report.read_text()),Path(temp),args.live)
+        check(json.loads(args.report.read_text()),Path(temp),args.live,args.allow_missing_manifest_runtime)
 

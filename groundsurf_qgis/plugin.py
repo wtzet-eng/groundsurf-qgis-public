@@ -6,7 +6,8 @@ from qgis.PyQt.QtCore import Qt, QLocale, QTimer, QUrl
 from qgis.PyQt.QtGui import QAction, QColor, QDesktopServices
 from qgis.PyQt.QtWidgets import (
     QComboBox, QDockWidget, QHBoxLayout, QLabel, QLineEdit, QFrame,
-    QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget
+    QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QCheckBox, QMenu, QToolButton, QSizePolicy
 )
 from qgis.PyQt.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from qgis.core import (
@@ -16,6 +17,10 @@ from qgis.core import (
 from qgis.gui import QgsMapTool, QgsRubberBand, QgsVertexMarker
 from qgis.core import QgsNetworkAccessManager
 
+from .presentation import STYLE, ReportText, SiteForm
+from .basemap import Basemap
+from .version import VERSION, USER_AGENT
+from .compat import POLYGON_GEOMETRY
 from .core import (
     API_URL, GEOCODER_URL, COUNTRIES, LANGUAGES, MAX_RESPONSE_BYTES,
     available_languages, format_report_text, geocoder_search_url,
@@ -32,16 +37,16 @@ class PolygonDrawTool(QgsMapTool):
         self._complete = complete
         self._cancelled = cancelled
         self._points = []
-        self._band = QgsRubberBand(canvas, QgsWkbTypes.PolygonGeometry)
+        self._band = QgsRubberBand(canvas, POLYGON_GEOMETRY)
         self._band.setColor(QColor(21, 103, 155))
         self._band.setFillColor(QColor(38, 166, 124, 55))
         self._band.setWidth(2)
 
     def canvasPressEvent(self, event):
-        if event.button() == Qt.RightButton:
+        if event.button() == Qt.MouseButton.RightButton:
             self._cancelled()
             return
-        if event.button() != Qt.LeftButton:
+        if event.button() != Qt.MouseButton.LeftButton:
             return
         point = self.toMapCoordinates(event.pos())
         if not self._points or self._points[-1] != point:
@@ -64,13 +69,13 @@ class PolygonDrawTool(QgsMapTool):
         self._complete(QgsGeometry.fromPolygonXY([ring]), self._canvas.mapSettings().destinationCrs())
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+        if event.key() == Qt.Key.Key_Escape:
             self._cancelled()
         else:
             super().keyPressEvent(event)
 
     def _redraw(self):
-        self._band.reset(QgsWkbTypes.PolygonGeometry)
+        self._band.reset(POLYGON_GEOMETRY)
         for p in self._points:
             self._band.addPoint(p, False)
         if self._points:
@@ -78,7 +83,7 @@ class PolygonDrawTool(QgsMapTool):
 
     def clear(self):
         self._points = []
-        self._band.reset(QgsWkbTypes.PolygonGeometry)
+        self._band.reset(POLYGON_GEOMETRY)
         self._band.hide()
 
 
@@ -121,6 +126,9 @@ class GroundSurfPlugin(ReportActions):
         self._stream = None
         self._elapsed_timer = None
         self._request_start = None
+        self.basemap = None
+        self._suggest_timer = None
+        self._search_select_single = False
 
 
     def initGui(self):
@@ -130,6 +138,11 @@ class GroundSurfPlugin(ReportActions):
         self.iface.addToolBarIcon(self.action)
 
     def unload(self):
+        if self._suggest_timer:
+            self._suggest_timer.stop()
+        if self.basemap:
+            self.basemap.close()
+            self.basemap = None
         if self.dock:
             self.iface.mapCanvas().destinationCrsChanged.disconnect(self._refresh_outline)
         self.reset_report()
@@ -178,148 +191,253 @@ class GroundSurfPlugin(ReportActions):
             self._create_panel()
         self.dock.show()
         self.dock.raise_()
+        if self.basemap is None:
+            self.basemap = Basemap(self.iface, self._settings, self._map_unavailable)
+            try:
+                self.basemap.start()
+            except ValueError as exc:
+                self.progress.setText(str(exc))
+        self.address_input.setFocus()
 
     def _create_panel(self):
         self.dock = QDockWidget("GroundSurf — Site Intelligence", self.iface.mainWindow())
         self.dock.setObjectName("groundsurfSiteIntelligenceDock")
         root = QWidget(self.dock)
+        root.setObjectName("groundsurfPanel")
+        root.setStyleSheet(STYLE)
+        root.setMinimumWidth(310)
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(7, 7, 7, 7)
-        heading = QLabel("GroundSurf • Site Intelligence")
-        heading.setStyleSheet("font-weight: bold; font-size: 15px;")
-        layout.addWidget(heading)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(9)
+        self._labels = []
 
-        # A scrollable control area keeps the report button visible even when
-        # QGIS is on a small screen or several other dock panels are open.
-        form_scroll = QScrollArea(root)
-        form_scroll.setWidgetResizable(True)
-        form_scroll.setFrameShape(QFrame.NoFrame)
-        form_scroll.setMaximumHeight(320)
-        form_scroll.setMinimumHeight(140)
+        def labelled(widget, english, polish):
+            self._labels.append((widget, english, polish))
+            return widget
+
+        top = QHBoxLayout()
+        heading = QLabel("GroundSurf")
+        heading.setObjectName("brand")
+        top.addWidget(heading, 1)
+        self.tools_button = labelled(QToolButton(), "More", "Więcej")
+        self.tools_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.tools_menu = QMenu(self.tools_button)
+        self.tools_button.setMenu(self.tools_menu)
+        top.addWidget(self.tools_button)
+        layout.addLayout(top)
+        self.site_toggle = labelled(QPushButton(), "Find or change site", "Wybierz lub zmień lokalizację")
+        self.site_toggle.setCheckable(True)
+        self.site_toggle.setChecked(True)
+        self.site_toggle.hide()
+        layout.addWidget(self.site_toggle)
+
+        self.form = SiteForm(root)
+        self.form.setWidgetResizable(True)
+        self.form.setSizeAdjustPolicy(QScrollArea.SizeAdjustPolicy.AdjustToContents)
+        self.form.setFrameShape(QFrame.Shape.NoFrame)
+        self.form.setMinimumHeight(0)
+        self.form.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        self.form.setMaximumHeight(480)
         form = QWidget()
         controls = QVBoxLayout(form)
-        controls.setContentsMargins(2, 2, 5, 2)
-        controls.setSpacing(5)
-
-        address_label = QLabel("Find an address or place:")
-        controls.addWidget(address_label)
+        controls.setContentsMargins(0, 0, 4, 0)
+        controls.setSpacing(9)
+        controls.setAlignment(Qt.AlignmentFlag.AlignTop)
         address_row = QHBoxLayout()
         self.address_input = QLineEdit()
-        self.address_input.setPlaceholderText("Street, number, city or village")
+        self.address_input.setClearButtonEnabled(True)
+        self.address_input.setMinimumWidth(0)
         self.address_input.returnPressed.connect(self.search_address)
+        self.address_input.textEdited.connect(self._address_edited)
         address_row.addWidget(self.address_input, 1)
-        self.search_button = QPushButton("Search")
+        self.search_button = labelled(QPushButton(), "Find", "Szukaj")
         self.search_button.clicked.connect(self.search_address)
         address_row.addWidget(self.search_button)
         controls.addLayout(address_row)
         self.address_results = QComboBox()
-        self.address_results.addItem("Search results appear here — then select one", None)
+        self.address_results.setMinimumWidth(0)
+        self.address_results.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.address_results.setMinimumContentsLength(12)
+        self.address_results.addItem("", None)
         self.address_results.currentIndexChanged.connect(self._on_address_result_selected)
+        self.address_results.hide()
         controls.addWidget(self.address_results)
-        attribution = QLabel("Address search: © OpenStreetMap contributors / Photon (komoot).")
-        attribution.setWordWrap(True)
+        attribution = QLabel("© OpenStreetMap contributors · Photon")
+        attribution.setObjectName("hint")
         controls.addWidget(attribution)
 
-        country_label = QLabel("Site country:")
-        controls.addWidget(country_label)
+        buttons = QHBoxLayout()
+        self.parcel_button = labelled(QPushButton(), "Pick parcel", "Wskaż działkę")
+        self.parcel_button.clicked.connect(self.pick_parcel)
+        buttons.addWidget(self.parcel_button)
+        draw = labelled(QPushButton(), "Draw boundary", "Narysuj granicę")
+        draw.clicked.connect(self.start_drawing)
+        buttons.addWidget(draw)
+        controls.addLayout(buttons)
+        self.radius_button = labelled(QPushButton(), "Use a 50 m radius here", "Użyj promienia 50 m")
+        self.radius_button.clicked.connect(self.use_address_radius)
+        self.radius_button.hide()
+        controls.addWidget(self.radius_button)
+
+        self.options_button = labelled(QPushButton(), "Country, language and defaults", "Kraj, język i ustawienia")
+        self.options_button.setCheckable(True)
+        controls.addWidget(self.options_button)
+        self.options = QWidget()
+        options = QVBoxLayout(self.options)
+        options.setContentsMargins(0, 0, 0, 0)
+        options.addWidget(labelled(QLabel(), "Site country", "Kraj lokalizacji"))
         self.country = QComboBox()
-        self.country.addItem("— Select country —", "")
+        self.country.addItem("", "")
         for code, name in sorted(COUNTRIES, key=lambda item: item[1]):
             self.country.addItem("%s (%s)" % (name, code), code)
-        controls.addWidget(self.country)
-
-        language_label = QLabel("Report language:")
-        controls.addWidget(language_label)
+        options.addWidget(self.country)
+        options.addWidget(labelled(QLabel(), "Report language", "Język raportu"))
+        language_row = QHBoxLayout()
         self.language = QComboBox()
-        language_actions = QHBoxLayout()
-        language_actions.addWidget(self.language, 1)
-        self.use_site_language_button = QPushButton("Use site language")
+        language_row.addWidget(self.language, 1)
+        self.use_site_language_button = labelled(QPushButton(), "Automatic", "Automatycznie")
         self.use_site_language_button.clicked.connect(self._use_site_language)
-        language_actions.addWidget(self.use_site_language_button)
-        controls.addLayout(language_actions)
-        self.country.currentIndexChanged.connect(self._on_country_changed)
-        self.language.activated.connect(self._on_explicit_language)
-        last_country = str(self._settings.value("GroundSurfQGIS/last_country", "") or "")
-        last_index = self.country.findData(last_country)
-        if last_index >= 0:
-            self.country.setCurrentIndex(last_index)
-        else:
-            self._refresh_languages()
-
-        actions = QHBoxLayout()
-        selected = QPushButton("Use selected polygon")
-        selected.clicked.connect(self.use_selected_polygon)
-        actions.addWidget(selected)
-        draw = QPushButton("Draw a site")
-        draw.clicked.connect(self.start_drawing)
-        actions.addWidget(draw)
-        controls.addLayout(actions)
-        self.site_status = QLabel("Select one polygon, or draw a site after finding an address.")
-        self.site_status.setWordWrap(True)
-        controls.addWidget(self.site_status)
-        privacy = QLabel(
-            "Searches send the address to Photon; reports send only your site "
-            "geometry, area, country and language to GroundSurf. "
-            "A drawn site is not an official cadastral parcel."
-        )
+        language_row.addWidget(self.use_site_language_button)
+        options.addLayout(language_row)
+        self.auto_search = labelled(QCheckBox(), "Suggest addresses as I type", "Podpowiadaj adresy podczas pisania")
+        self.auto_search.setChecked(self._settings.value("GroundSurfQGIS/auto_search", True) not in (False, "false", "0"))
+        self.auto_search.toggled.connect(self._auto_search_changed)
+        options.addWidget(self.auto_search)
+        self.auto_map = labelled(QCheckBox(), "OpenStreetMap in empty projects", "OpenStreetMap w pustych projektach")
+        self.auto_map.setChecked(self._settings.value("GroundSurfQGIS/auto_map", True) not in (False, "false", "0"))
+        self.auto_map.toggled.connect(lambda value: self._settings.setValue("GroundSurfQGIS/auto_map", value))
+        options.addWidget(self.auto_map)
+        privacy = labelled(QLabel(), "Typed searches go to Photon. GroundSurf receives your chosen site when you request its parcel or report.",
+                           "Wpisywane adresy trafiają do Photon. GroundSurf otrzymuje wybraną lokalizację przy wyszukiwaniu działki lub raportu.")
         privacy.setWordWrap(True)
-        controls.addWidget(privacy)
-        self.site_toggle = QPushButton()
-        self.site_toggle.setCheckable(True)
-        self.site_toggle.setChecked(True)
-        self.site_toggle.toggled.connect(form_scroll.setVisible)
-        layout.addWidget(self.site_toggle)
-        self.form = form_scroll
-        form_scroll.setWidget(form)
-        layout.addWidget(form_scroll)
+        privacy.setObjectName("hint")
+        options.addWidget(privacy)
+        controls.addWidget(self.options)
+        self.options.hide()
+        self.options_button.toggled.connect(self.options.setVisible)
+        self.options_button.toggled.connect(self._size_form)
+        self.form.setWidget(form)
+        self.site_toggle.toggled.connect(self.form.setVisible)
+        layout.addWidget(self.form)
 
-        self.report_text = QPlainTextEdit()
-        self.report_text.setReadOnly(True)
-        self.report_text.setPlaceholderText(
-            "Choose a site and generate its GroundSurf report. "
-            "The evidence and limitations will appear here."
-        )
-        layout.addWidget(self.report_text, 1)
-
-        # Keep the primary action and status OUTSIDE the scrolling form.
-        self.progress = QLabel("To generate a report: draw or select a polygon, then choose its country.")
+        self.site_status = QLabel()
+        self.site_status.setObjectName("siteCard")
+        self.site_status.setWordWrap(True)
+        self.site_status.setTextFormat(Qt.TextFormat.PlainText)
+        layout.addWidget(self.site_status)
+        self.progress = QLabel()
+        self.progress.setObjectName("hint")
         self.progress.setWordWrap(True)
+        self.progress.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.progress)
-        self.analyze_button = QPushButton("Generate GroundSurf report")
-        self.analyze_button.setStyleSheet("font-weight: bold; padding: 7px;")
+        self.analyze_button = labelled(QPushButton(), "Generate GroundSurf report", "Generuj raport GroundSurf")
+        self.analyze_button.setObjectName("primary")
         self.analyze_button.clicked.connect(self.analyze)
         layout.addWidget(self.analyze_button)
-        self.cancel_button = QPushButton("Cancel request")
+        self.cancel_button = labelled(QPushButton(), "Cancel request", "Anuluj")
         self.cancel_button.setEnabled(False)
+        self.cancel_button.hide()
         self.cancel_button.clicked.connect(self.cancel_analysis)
         layout.addWidget(self.cancel_button)
-        self.open_button = QPushButton("Detailed report")
+
+        self.report_text = ReportText()
+        self.report_text.hide()
+        layout.addWidget(self.report_text, 1)
+        report_actions = QHBoxLayout()
+        self.open_button = labelled(QPushButton(), "Read full report", "Czytaj pełny raport")
         self.open_button.setEnabled(False)
         self.open_button.clicked.connect(self.open_report)
-        layout.addWidget(self.open_button)
+        report_actions.addWidget(self.open_button)
+        self.show_qgis_button = labelled(QPushButton(), "Map evidence", "Dane na mapie")
+        self.show_qgis_button.clicked.connect(self.show_in_qgis)
+        report_actions.addWidget(self.show_qgis_button)
+        self.report_actions = QWidget()
+        self.report_actions.setLayout(report_actions)
+        self.report_actions.hide()
+        layout.addWidget(self.report_actions)
+        self.map_button = labelled(QToolButton(), "Map layers", "Warstwy mapy")
+        self.map_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.map_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.map_menu = QMenu(self.map_button)
+        self.map_button.setMenu(self.map_menu)
+        layout.addWidget(self.map_button)
+        self.map_status = QLabel()
+        self.map_status.setObjectName("hint")
+        self.map_status.setWordWrap(True)
+        self.map_status.hide()
+        layout.addWidget(self.map_status)
+        self.context_label = QLabel()
+        self.context_label.setObjectName("hint")
+        self.context_label.setWordWrap(True)
+        layout.addWidget(self.context_label)
+        self.empty_space = layout
+        layout.addStretch(1)
 
-        from qgis.PyQt.QtWidgets import QMenu, QToolButton
-        self.tools_button = QToolButton()
-        self.tools_button.setPopupMode(QToolButton.InstantPopup)
-        self.tools_menu = QMenu(self.tools_button)
-        self.tools_button.setMenu(self.tools_menu)
-        controls.addWidget(self.tools_button)
-        self._labels = [(address_label,"Find an address or place","Znajdź adres lub miejscowość"),
-                        (country_label,"Site country","Kraj lokalizacji"),(language_label,"Report language","Język raportu"),
-                        (privacy,"Address searches go to Photon. GroundSurf receives the selected site, country and language.","Zapytanie adresowe trafia do Photon. GroundSurf otrzymuje wybrany obszar, kraj i język."),
-                        (self.site_toggle,"Site selection","Wybór lokalizacji"),(selected,"Use selected polygon","Użyj zaznaczonego poligonu"),(draw,"Draw a site","Narysuj granicę"),
-                        (self.search_button,"Search","Szukaj"),(self.use_site_language_button,"Use site language","Język kraju"),
-                        (self.analyze_button,"Generate GroundSurf report","Generuj raport GroundSurf"),(self.cancel_button,"Cancel request","Anuluj"),
-                        (self.open_button,"Detailed report","Raport szczegółowy"),(self.tools_button,"Maps and saved reports","Mapy i zapisane raporty")]
-        self._translate()
+        self.country.currentIndexChanged.connect(self._on_country_changed)
+        self.language.activated.connect(self._on_explicit_language)
+        self._suggest_timer = QTimer(self.dock)
+        self._suggest_timer.setSingleShot(True)
+        self._suggest_timer.timeout.connect(lambda: self.search_address(automatic=True))
+        last_country = str(self._settings.value("GroundSurfQGIS/last_country", "") or "")
+        last_index = self.country.findData(last_country)
+        self.country.setCurrentIndex(max(0, last_index))
+        self._refresh_languages()
+        self.site_status.setText(self.tr2("Find an address, then choose its boundary.", "Znajdź adres, a następnie wybierz granicę."))
+        self.progress.setText(self.tr2("Country and language follow the selected address.", "Kraj i język dopasują się do wybranego adresu."))
         self.dock.visibilityChanged.connect(self._visibility)
         self.iface.mapCanvas().destinationCrsChanged.connect(self._refresh_outline)
         self.dock.setWidget(root)
-        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
+        self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
         self._update_analyze_state()
+        self._size_form()
+        self.iface.mainWindow().resizeDocks([self.dock], [390], Qt.Orientation.Horizontal)
+
+    def _size_form(self):
+        controls = self.form.widget().layout()
+        controls.invalidate()
+        controls.activate()
+        self.form.setMaximumHeight(min(460, controls.sizeHint().height() + 8))
+        self.form.updateGeometry()
+
+    def add_basemap(self):
+        self.map_status.hide()
+        if self.basemap is None:
+            self.basemap = Basemap(self.iface, self._settings, self._map_unavailable)
+        try:
+            self.basemap.add()
+        except ValueError as exc:
+            self.progress.setText(str(exc))
+
+    def _map_unavailable(self):
+        self.map_status.setText(self.tr2("Some map tiles are unavailable. Report generation can still continue.",
+                                        "Część kafelków mapy jest niedostępna. Nadal możesz wygenerować raport."))
+        self.map_status.show()
+
+    def use_address_radius(self):
+        hit = self.address_results.currentData()
+        if hit and hit.get("country") == self.country.currentData():
+            self.set_circle(hit["lat"], hit["lon"], 50)
+            self.radius_button.hide()
+
+    def _auto_search_changed(self, enabled):
+        self._settings.setValue("GroundSurfQGIS/auto_search", enabled)
+        if self._suggest_timer:
+            self._suggest_timer.stop()
+        if not enabled:
+            self._abort_address_search()
+
+    def _address_edited(self, text):
+        self._suggest_timer.stop()
+        self._abort_address_search()
+        self.address_results.hide()
+        self._size_form()
+        if self.auto_search.isChecked() and len(text.strip()) >= 3:
+            self._suggest_timer.start(900)
 
     def _visibility(self, visible):
         if not visible:
+            self._suggest_timer.stop()
+            self._abort_address_search()
             self.stop_services()
             self.cancel_analysis()
 
@@ -328,23 +446,34 @@ class GroundSurfPlugin(ReportActions):
             self._draw_selected_site_outline()
 
     def _translate(self):
-        if not hasattr(self, "_labels"):
+        if not hasattr(self, "context_label"):
             return
-        for widget,en,pl in self._labels:
-            widget.setText(self.tr2(en,pl))
-        self.address_input.setPlaceholderText(self.tr2("Street, number, town","Ulica, numer, miejscowość"))
-        self.country.setItemText(0,self.tr2("Choose country","Wybierz kraj"))
-        self.report_text.setPlaceholderText(self.tr2("Select a site and generate its report.","Wybierz obszar i wygeneruj raport."))
+        for widget, en, pl in self._labels:
+            widget.setText(self.tr2(en, pl))
+        self.address_input.setPlaceholderText(self.tr2("Address or place…", "Adres lub miejscowość…"))
+        self.country.setItemText(0, self.tr2("Choose country", "Wybierz kraj"))
+        country = self.country.currentData() or "—"
+        language = self.language.currentText()
+        self.context_label.setText(country + " · " + language)
+        self.map_menu.clear()
+        self.map_menu.addAction("OpenStreetMap", self.add_basemap)
+        self.map_menu.addAction(self.tr2("Geology and other layers", "Geologia i inne warstwy"), self.add_overlay)
+        self.map_menu.addAction(self.tr2("Zoom to site", "Powiększ do lokalizacji"), self.zoom_site)
         self.tools_menu.clear()
-        self.tools_menu.addAction(self.tr2("Recent reports","Ostatnie raporty"),self.open_recent)
-        if self.country.currentData()=="HK":
-            self.tools_menu.addAction(self.tr2("Find lot by reference","Znajdź działkę według identyfikatora"),self.hk_lot)
-        self.tools_menu.addAction(self.tr2("Screen an address radius","Sprawdź obszar wokół adresu"),self.point_radius)
-        for en,pl,fn in [("Pick parcel on map","Wskaż działkę na mapie",self.pick_parcel),("Find official parcel","Znajdź działkę",self.lookup),
-                         ("Open JSON","Otwórz JSON",self.load_record),("Open report by ID","Otwórz raport według ID",self.reopen_id),
-                         ("Map layers","Warstwy mapowe",self.add_overlay),
-                         ("Give feedback","Przekaż opinię",lambda: QDesktopServices.openUrl(QUrl("https://groundsurf.net/feedback?lang="+self.language.currentData())))]:
-            self.tools_menu.addAction(self.tr2(en,pl),fn)
+        for en, pl, fn in [
+            ("Recent reports", "Ostatnie raporty", self.open_recent),
+            ("Open website report", "Otwórz raport ze strony", self.open_web_report),
+            ("Open saved JSON", "Otwórz zapisany JSON", self.load_record),
+            ("Use selected polygon", "Użyj zaznaczonego poligonu", self.use_selected_polygon),
+            ("Zoom to site", "Powiększ do lokalizacji", self.zoom_site),
+            ("Screen an address radius…", "Ustaw promień wokół adresu…", self.point_radius),
+            ("Find official parcel", "Znajdź działkę ewidencyjną", self.lookup),
+            ("Explore in 3D", "Otwórz w 3D", self.explore_3d),
+            ("Give feedback", "Przekaż opinię", lambda: QDesktopServices.openUrl(QUrl("https://groundsurf.net/feedback?lang=" + self.language.currentData()))),
+        ]:
+            self.tools_menu.addAction(self.tr2(en, pl), fn)
+        if country == "HK":
+            self.tools_menu.addAction(self.tr2("Find lot by reference", "Znajdź działkę według identyfikatora"), self.hk_lot)
 
     def _update_analyze_state(self):
         if not hasattr(self, "analyze_button"):
@@ -360,8 +489,9 @@ class GroundSurfPlugin(ReportActions):
         else:
             self.analyze_button.setToolTip("Select the site country before generating the report")
 
-    def search_address(self):
-        """Explicit user-triggered Photon search; never autocomplete or bulk query."""
+    def search_address(self, checked=False, automatic=False):
+        """Debounced Photon search, bounded by the existing cache and request interval."""
+        self._suggest_timer.stop()
         if self._search_reply is not None:
             return
         query = self.address_input.text().strip()
@@ -374,32 +504,40 @@ class GroundSurfPlugin(ReportActions):
             return
         key = (endpoint, query.casefold())
         if key in self._search_cache:
-            self._show_address_results(self._search_cache[key])
+            self._show_address_results(self._search_cache[key], select_single=not automatic)
             return
         if time.monotonic() - self._search_last_at < 1.1:
-            self.progress.setText("Please wait a moment between address searches.")
+            self._suggest_timer.start(1200)
             return
         self._search_last_at = time.monotonic()
         self._pending_search_key = key
+        self._search_select_single = not automatic
         self.search_button.setEnabled(False)
-        self.progress.setText("Searching for address…")
+        self.progress.setText(self.tr2("Finding addresses…", "Wyszukiwanie adresów…"))
         request = QNetworkRequest(QUrl(url))
-        request.setRawHeader(b"User-Agent", b"GroundSurf-QGIS/0.2 (https://groundsurf.net)")
+        request.setRawHeader(b"User-Agent", USER_AGENT.encode("ascii"))
         request.setRawHeader(b"Accept", b"application/json")
         try:
             self._search_reply = QgsNetworkAccessManager.instance().get(request)
             self._search_reply.finished.connect(self._on_address_search_finished)
             self._search_timer = QTimer(self.dock)
             self._search_timer.setSingleShot(True)
-            self._search_timer.timeout.connect(self._abort_address_search)
+            self._search_timer.timeout.connect(self._address_search_timeout)
             self._search_timer.start(18000)
         except Exception as exc:
             self._search_reply = None
             self.search_button.setEnabled(True)
-            self.progress.setText("Address search could not start: %s" % exc)
+            self.progress.setText(self.tr2("Address search could not start", "Nie można rozpocząć wyszukiwania") + ": %s" % exc)
+
+    def _address_search_timeout(self):
+        self._abort_address_search()
+        self.progress.setText(self.tr2("Address search timed out. Try Find again, or draw a boundary.",
+                                      "Upłynął czas wyszukiwania. Kliknij Szukaj ponownie lub narysuj granicę."))
 
     def _abort_address_search(self):
         if self._search_reply is not None:
+            self._pending_search_key = None
+            self._search_select_single = False
             self._search_reply.abort()
 
     def _on_address_search_finished(self):
@@ -415,43 +553,51 @@ class GroundSurfPlugin(ReportActions):
             reply.deleteLater()
             return
         self.search_button.setEnabled(True)
-        status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
+        status = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
         error = reply.error()
         raw = bytes(reply.readAll()) if reply.isOpen() else b""
         detail = reply.errorString()
         reply.deleteLater()
-        if error != QNetworkReply.NoError or status != 200:
-            self.progress.setText("Address search unavailable: " + str(detail)[:180])
+        key = self._pending_search_key
+        self._pending_search_key = None
+        if key and key[1] != self.address_input.text().strip().casefold():
+            return
+        if error == QNetworkReply.NetworkError.OperationCanceledError:
+            return
+        if error != QNetworkReply.NetworkError.NoError or status != 200:
+            self.progress.setText(self.tr2("Address search unavailable", "Wyszukiwanie adresu niedostępne") + " · " + str(detail)[:180])
             return
         if len(raw) > 200000:
-            self.progress.setText("Address results exceeded the size limit.")
+            self.progress.setText(self.tr2("Address results exceeded the size limit.", "Wyniki wyszukiwania przekroczyły limit wielkości."))
             return
         try:
             results = parse_geocoder_results(json.loads(raw.decode("utf-8")))
         except (ValueError, UnicodeDecodeError) as exc:
-            self.progress.setText("Unable to read address results: %s" % exc)
+            self.progress.setText(self.tr2("Unable to read address results", "Nie można odczytać wyników wyszukiwania") + ": %s" % exc)
             return
-        key = self._pending_search_key
-        self._pending_search_key = None
         if key is not None:
             self._search_cache[key] = results
         if len(self._search_cache) > 40:
             self._search_cache.pop(next(iter(self._search_cache)))
-        self._show_address_results(results)
+        self._show_address_results(results, select_single=self._search_select_single)
 
-    def _show_address_results(self, results):
+    def _show_address_results(self, results, select_single=False):
         self.address_results.blockSignals(True)
         try:
             self.address_results.clear()
-            self.address_results.addItem("Choose a result to zoom the map", None)
+            self.address_results.addItem(self.tr2("Choose an address…", "Wybierz adres…"), None)
             for result in results:
                 self.address_results.addItem(result["label"], result)
         finally:
             self.address_results.blockSignals(False)
+        self.address_results.setVisible(bool(results))
+        self._size_form()
         if results:
-            self.progress.setText("%d places found. Choose a result, then draw/select your site." % len(results))
+            self.progress.setText(self.tr2("Choose an address to see it on the map.", "Wybierz adres, aby pokazać go na mapie."))
+            if select_single and len(results) == 1:
+                self.address_results.setCurrentIndex(1)
         else:
-            self.progress.setText("No matching address. Try city, street, or a different spelling.")
+            self.progress.setText(self.tr2("No matching address. Try adding the town or country.", "Brak adresu. Dodaj miejscowość lub kraj."))
 
     def _on_address_result_selected(self, index):
         if index <= 0:
@@ -459,6 +605,8 @@ class GroundSurfPlugin(ReportActions):
         result = self.address_results.itemData(index)
         if not isinstance(result, dict):
             return
+        self._suggest_timer.stop()
+        self._abort_address_search()
         canvas = self.iface.mapCanvas()
         wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
         try:
@@ -481,22 +629,25 @@ class GroundSurfPlugin(ReportActions):
             self._address_marker.setCenter(place)
             self._address_marker.setColor(QColor(20, 130, 175))
             self._address_marker.setIconSize(16)
-            self._address_marker.setIconType(QgsVertexMarker.ICON_CROSS)
+            self._address_marker.setIconType(QgsVertexMarker.IconType.ICON_CROSS)
             country = result.get("country", "")
             idx = self.country.findData(country)
-            if idx >= 0:
-                self.country.setCurrentIndex(idx)
+            self.country.setCurrentIndex(max(0, idx))
+            if idx <= 0:
+                self.options_button.setChecked(True)
+            self.radius_button.setVisible(idx > 0)
+            self._size_form()
+            self.site_toggle.setChecked(True)
             self.site_status.setText(
-                "Map centered on %s. Draw a site boundary or select one polygon." %
-                result["label"]
+                self.tr2("Address point", "Punkt adresowy") + " · " + result["label"]
             )
             self.progress.setText(
-                "Address located. The cross marks an approximate location, not a parcel boundary."
+                self.tr2("Check the location, then pick a parcel or draw its boundary.", "Sprawdź lokalizację, a następnie wskaż działkę lub narysuj granicę.")
             )
-            if result.get("address_level"):
+            if result.get("address_level") and idx > 0:
                 self.lookup_at(result)
         except Exception as exc:
-            self.progress.setText("Unable to zoom to address: %s" % exc)
+            self.progress.setText(self.tr2("Unable to locate address", "Nie można ustalić lokalizacji") + " · " + str(exc))
 
     def _refresh_languages(self):
         country = self.country.currentData() or ""
@@ -550,19 +701,21 @@ class GroundSurfPlugin(ReportActions):
         self._geometry_crs = crs
         self.site_status.setText(description)
         self.site_status.setToolTip(description)
-        self.progress.setText(self.tr2("Site ready. Choose its country and generate the report.","Obszar gotowy. Wybierz kraj i kliknij Generuj."))
+        self.progress.setText(self.tr2("Site ready. Generate a report when the boundary looks right.","Obszar gotowy. Sprawdź granicę i wygeneruj raport."))
         self.open_button.setEnabled(False)
         self._current_report_url = ""
         self._draw_selected_site_outline()
+        self.radius_button.hide()
+        self._size_form()
         self._update_analyze_state()
 
     def _draw_selected_site_outline(self):
         """Keep chosen site visible after the drawing tool is deactivated."""
         canvas = self.iface.mapCanvas()
         if self._site_band is None:
-            self._site_band = QgsRubberBand(canvas, QgsWkbTypes.PolygonGeometry)
-            self._site_band.setColor(QColor(20, 116, 160))
-            self._site_band.setFillColor(QColor(20, 116, 160, 35))
+            self._site_band = QgsRubberBand(canvas, POLYGON_GEOMETRY)
+            self._site_band.setColor(QColor(36, 111, 69))
+            self._site_band.setFillColor(QColor(36, 111, 69, 35))
             self._site_band.setWidth(3)
         try:
             preview = QgsGeometry(self._geometry)
@@ -573,14 +726,16 @@ class GroundSurfPlugin(ReportActions):
             self._site_band.setToGeometry(preview, None)
             self._site_band.show()
         except Exception:
-            self._site_band.reset(QgsWkbTypes.PolygonGeometry)
+            self._site_band.reset(POLYGON_GEOMETRY)
 
     def use_selected_polygon(self):
+        self._suggest_timer.stop()
+        self._abort_address_search()
         layer = self.iface.activeLayer()
         if not isinstance(layer, QgsVectorLayer):
             self._notify("Choose a polygon vector layer in QGIS first.")
             return
-        if layer.geometryType() != QgsWkbTypes.PolygonGeometry:
+        if layer.geometryType() != POLYGON_GEOMETRY:
             self._notify("The active layer must contain polygons.")
             return
         selection = layer.selectedFeatures()
@@ -596,6 +751,8 @@ class GroundSurfPlugin(ReportActions):
         self.site_kind = "imported"
 
     def start_drawing(self):
+        self._suggest_timer.stop()
+        self._abort_address_search()
         canvas = self.iface.mapCanvas()
         if self._draw_tool is None:
             self._draw_tool = PolygonDrawTool(canvas, self._finish_draw, self._cancel_draw)
@@ -636,13 +793,13 @@ class GroundSurfPlugin(ReportActions):
             # without clicking GroundSurf's dedicated selection button.
             layer = self.iface.activeLayer()
             if (isinstance(layer, QgsVectorLayer)
-                    and layer.geometryType() == QgsWkbTypes.PolygonGeometry
+                    and layer.geometryType() == POLYGON_GEOMETRY
                     and layer.selectedFeatureCount() == 1):
                 self.use_selected_polygon()
         if self._geometry is None or self._geometry_crs is None:
             raise ValueError("Select one polygon or draw a site first.")
         source = QgsGeometry(self._geometry)
-        if QgsWkbTypes.geometryType(source.wkbType()) != QgsWkbTypes.PolygonGeometry:
+        if QgsWkbTypes.geometryType(source.wkbType()) != POLYGON_GEOMETRY:
             raise ValueError("Only polygon sites are supported in this prototype.")
         if source.isMultipart():
             raise ValueError("Multi-part polygons are not supported. Select a single polygon.")
@@ -681,6 +838,7 @@ class GroundSurfPlugin(ReportActions):
             payload = self._site_payload()
         except (ValueError, RuntimeError) as exc:
             if self._geometry is not None and not self.country.currentData():
+                self.options_button.setChecked(True)
                 self.country.setFocus()
                 self.site_status.setText(self.tr2("Choose the site country.","Wybierz kraj lokalizacji."))
             self.site_toggle.setChecked(True)
@@ -696,14 +854,18 @@ class GroundSurfPlugin(ReportActions):
         self.reset_report()
         self.analyze_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
+        self.cancel_button.show()
+        self.site_toggle.show()
+        self.report_text.show()
+        self.empty_space.setStretch(self.empty_space.count() - 1, 0)
         self.site_toggle.setChecked(False)
         self._request_start = time.monotonic()
         self.progress.setText(self.tr2("Gathering evidence…","Pobieranie danych…"))
         self.report_text.setPlainText(self.progress.text())
         request = QNetworkRequest(QUrl(API_URL+"?progressStream=1"))
-        request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json; charset=utf-8")
+        request.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json; charset=utf-8")
         request.setRawHeader(b"Accept", b"text/event-stream")
-        request.setRawHeader(b"User-Agent", b"GroundSurf-QGIS/0.3.2")
+        request.setRawHeader(b"User-Agent", USER_AGENT.encode("ascii"))
         request.setTransferTimeout(210000)
         self._timed_out = False
         self._cancelled = False
@@ -759,7 +921,10 @@ class GroundSurfPlugin(ReportActions):
             self._reply.abort()
 
     def _failure(self, message):
-        self.progress.setText(self.tr2("Report unavailable","Raport niedostępny") + " · 0.3.2 · " + message)
+        self.report_text.show()
+        self.empty_space.setStretch(self.empty_space.count() - 1, 0)
+        self.cancel_button.hide()
+        self.progress.setText(self.tr2("Report unavailable","Raport niedostępny") + " · " + VERSION + " · " + message)
         if self.language.currentData() == "pl":
             self.report_text.setPlainText("Raport nie został wygenerowany.\n\n"+message+"\n\nMożesz ponowić próbę dla tej samej lokalizacji.")
             return
@@ -791,9 +956,10 @@ class GroundSurfPlugin(ReportActions):
             reply.deleteLater()
             return
         self.cancel_button.setEnabled(False)
+        self.cancel_button.hide()
         self._update_analyze_state()
         raw = bytes(reply.readAll()) if reply.isOpen() else b""
-        status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
+        status = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
         network_error = reply.error()
         description = reply.errorString()
         reply.deleteLater()
@@ -819,7 +985,7 @@ class GroundSurfPlugin(ReportActions):
             self._failure("GroundSurf returned HTTP %s: %s" %
                           (status, str(message or description)[:300]))
             return
-        if network_error != QNetworkReply.NoError:
+        if network_error != QNetworkReply.NetworkError.NoError:
             self._failure(self.tr2("Network error","Błąd sieci")+" · "+description)
             return
         try:
@@ -835,7 +1001,7 @@ class GroundSurfPlugin(ReportActions):
             data["qgis_site_kind"] = self._submitted_kind
             self.display(data)
             self.remember(data)
-            self.progress.setText(self.tr2("Report ready","Raport gotowy")+" · 0.3.2 · HTTP %s · %s" % (status,data["id"]))
+            self.progress.setText(self.tr2("Report ready","Raport gotowy")+" · " + VERSION + " · HTTP %s · %s" % (status,data["id"]))
             self.request_interpretation()
         except ValueError as exc:
             self._failure(str(exc))
@@ -845,10 +1011,10 @@ class GroundSurfPlugin(ReportActions):
         def done(data):
             parts = [x for x in (data.get("interpretation") or []) if isinstance(x,str) and x.strip()]
             if self.report is report and parts:
-                body = report["id"]+"\n\n"+"\n\n".join(parts)+"\n\n"+summary(report)
-                self.report_text.setPlainText(body)
+                self._interpretation = parts
+                self.report_text.setPlainText(summary(report, compact=True, interpretation=parts))
                 if self.reader:
-                    self.reader.overview.setPlainText(body)
+                    self.reader.overview.setPlainText(summary(report, interpretation=parts))
         self.service("interpret","/api/ai/interpret",{"report":dict(report,__groundsurf_front_page_mode=True)},done,
                      lambda message: self.progress.setToolTip(message))
 
