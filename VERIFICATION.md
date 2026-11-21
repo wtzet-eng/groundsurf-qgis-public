@@ -1,6 +1,6 @@
 # Release verification · 9 November 2026
 
-This is the historical 0.3.0 acceptance record. See [0.5.0 verification](docs/RELEASE-0.5.0.md) for the current interface update. The maintainer subsequently confirmed GPL-2.0-or-later for the plugin only, the package email and the public repository; those earlier publication decisions below are preserved as historical notes.
+This is the historical 0.3.0 acceptance record. See [0.5.1 verification](docs/RELEASE-0.5.1.md) for the current map-control update and [0.5.0 verification](docs/RELEASE-0.5.0.md) for the broader interface update. The maintainer subsequently confirmed GPL-2.0-or-later for the plugin only, the package email and the public repository; those earlier publication decisions below are preserved as historical notes.
 
 **Package** GroundSurf-QGIS-0.3.0.zip, 76,828 bytes  
 **SHA-256** `f6402dc43e1fce68f92049001f9c7e52c3aba1990def81448903e44dcb0ca8a0`  

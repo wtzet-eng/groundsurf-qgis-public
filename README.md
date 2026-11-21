@@ -1,4 +1,4 @@
-# GroundSurf for QGIS 0.5.0
+# GroundSurf for QGIS 0.5.1
 
 GroundSurf is an independent, non-commercial online service. This QGIS 3 plugin uses the same hosted evidence engine as the website.
 
@@ -11,7 +11,7 @@ GroundSurf is an independent, non-commercial online service. This QGIS 3 plugin 
 ## Install or upgrade
 
 1. Open **Plugins → Manage and Install Plugins → Install from ZIP**.
-2. Select **GroundSurf-QGIS-0.5.0.zip**. Enable **GroundSurf – Site Intelligence** in the Installed tab.
+2. Select **GroundSurf-QGIS-0.5.1.zip**. Enable **GroundSurf – Site Intelligence** in the Installed tab.
 3. Open **Plugins → GroundSurf**. If an older dock remains open after upgrading, restart QGIS. Existing project layers and the explicit report-language preference are retained.
 
 ## Generate your first report
@@ -22,7 +22,9 @@ GroundSurf is an independent, non-commercial online service. This QGIS 3 plugin 
 4. Click **Generate GroundSurf report**. The outline stays visible while evidence arrives. The form folds away and a groundwater-first overview appears in the dock.
 5. Choose **Read full report** for the larger internal reader. **Interpretation** and **Evidence** are the two main views. Search every evidence record, inspect sources, ask a question, or use **Save / export**. Checks, history, terrain, local Geotech tools, research and full JSON remain under **More detail**.
 
-**Find or change site** reopens the form. **Map layers** offers OpenStreetMap, country-specific overlays and zooming to the site. **Map evidence** plots supported source positions and links map selection to the evidence reader. A distance alone does not locate an observation.
+**OpenStreetMap** and **Map layers** stay at the top of the dock, directly below the heading. OpenStreetMap is on by default in empty projects. Its switch shows or hides the background and follows changes in QGIS's Layers panel. **Map layers** offers country-specific overlays and zooming to the site. The background remains below site and evidence layers in the map's drawing order.
+
+**Find or change site** reopens the form. **Map evidence** plots supported source positions and links map selection to the evidence reader. A distance alone does not locate an observation.
 
 **Country, language and defaults** lets you override the country or language and switch off automatic maps or suggestions. A remembered language choice takes priority over the site country. **Automatic** returns to the country language. English and Polish cover the main controls; other report languages use the existing service.
 
@@ -55,9 +57,9 @@ QT_QPA_PLATFORM=offscreen /usr/bin/python3 tools/smoke_qgis_handoff.py
 python3 tools/build_release.py
 ```
 
-With a saved report, `tools/check_stored_report.py REPORT.json` checks the reader, JSON, PDF, sharing UI and manifest. Its optional `--live` flag contacts the Polish parcel and map services. `tools/verify_package.py dist/GroundSurf-QGIS-0.5.0.zip` checks the actual package against source and runs five native workflow scripts from the extracted ZIP. The install package contains the plugin directory only. The QGIS metadata declares a minimum of 3.28. Version 0.5.0 was tested visibly on Debian 13 with QGIS 3.40.6 Bratislava / Qt 5 and with offscreen package tests on Ubuntu 24.04 with QGIS 3.34.4 Prizren. Windows, macOS, QGIS 3.28 and Qt 6 are not verified for this release.
+With a saved report, `tools/check_stored_report.py REPORT.json` checks the reader, JSON, PDF, sharing UI and manifest. Its optional `--live` flag contacts the Polish parcel and map services. `tools/verify_package.py dist/GroundSurf-QGIS-0.5.1.zip` checks the actual package against source and runs five native workflow scripts from the extracted ZIP. The install package contains the plugin directory only. The QGIS metadata declares a minimum of 3.28. Version 0.5.1 was tested visibly and with package tests on Debian 13 with QGIS 3.40.6 Bratislava / Qt 5. Version 0.5.0 also passed offscreen package tests on Ubuntu 24.04 with QGIS 3.34.4 Prizren. Windows, macOS, QGIS 3.28 and Qt 6 are not verified for this release.
 
-See [feature parity](PARITY.md) and [release verification](VERIFICATION.md). Version 0.5.0 verification is in [the release notes](docs/RELEASE-0.5.0.md). Public catalogue submission remains with the maintainer.
+See [feature parity](PARITY.md) and [release verification](VERIFICATION.md). Current verification is in [the 0.5.1 release notes](docs/RELEASE-0.5.1.md), with the broader report acceptance in [0.5.0](docs/RELEASE-0.5.0.md). Public catalogue submission remains with the maintainer.
 
 ## Plugin licence
 

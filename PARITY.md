@@ -1,5 +1,9 @@
 # Web and QGIS feature audit
 
+## 0.5.1 map controls · 21 November 2026
+
+OpenStreetMap and Map layers are always available below the dock heading. The OpenStreetMap switch follows QGIS layer/group visibility and reuses an existing background. Empty projects still start with OpenStreetMap enabled. The background's drawing order stays below site and evidence layers. See [0.5.1 verification](docs/RELEASE-0.5.1.md).
+
 ## 0.5.0 interface update · 21 November 2026
 
 The original web/API audit below is retained as a dated baseline. This update changes the native interface and defaults; it reuses the 0.4.1 evidence, parcel, report identity and export code. It is not a new audit of every currently deployed country adapter. GroundSurf Site Intelligence remains independent of GroundSurf Geothermal/Studio.

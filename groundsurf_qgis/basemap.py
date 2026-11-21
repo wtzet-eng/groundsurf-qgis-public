@@ -79,7 +79,7 @@ class Basemap:
             if is_osm(layer):
                 node = self.project.layerTreeRoot().findLayer(layer.id())
                 if node:
-                    node.setItemVisibilityChecked(True)
+                    node.setItemVisibilityCheckedParentRecursive(True)
                 return layer
         was_empty = not self.project.mapLayers()
         endpoint = str(self.settings.value("GroundSurfQGIS/osm_tiles", OSM_URL) or OSM_URL)

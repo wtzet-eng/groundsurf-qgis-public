@@ -18,7 +18,7 @@ from qgis.gui import QgsMapTool, QgsRubberBand, QgsVertexMarker
 from qgis.core import QgsNetworkAccessManager
 
 from .presentation import STYLE, ReportText, SiteForm
-from .basemap import Basemap
+from .basemap import Basemap, is_osm
 from .version import VERSION, USER_AGENT
 from .compat import POLYGON_GEOMETRY
 from .core import (
@@ -145,6 +145,9 @@ class GroundSurfPlugin(ReportActions):
             self.basemap = None
         if self.dock:
             self.iface.mapCanvas().destinationCrsChanged.disconnect(self._refresh_outline)
+            tree = QgsProject.instance().layerTreeRoot()
+            for signal in (tree.visibilityChanged, tree.addedChildren, tree.removedChildren):
+                signal.disconnect(self._sync_basemap_control)
         self.reset_report()
         picker = getattr(self,"picker",None)
         if picker and self.iface.mapCanvas().mapTool() is picker:
@@ -225,6 +228,25 @@ class GroundSurfPlugin(ReportActions):
         self.tools_button.setMenu(self.tools_menu)
         top.addWidget(self.tools_button)
         layout.addLayout(top)
+        maps = QHBoxLayout()
+        self.osm_toggle = QCheckBox("OpenStreetMap")
+        self.osm_toggle.toggled.connect(self._toggle_basemap)
+        maps.addWidget(self.osm_toggle, 1)
+        self.map_button = labelled(QToolButton(), "Map layers", "Warstwy mapy")
+        self.map_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.map_menu = QMenu(self.map_button)
+        self.map_button.setMenu(self.map_menu)
+        maps.addWidget(self.map_button)
+        layout.addLayout(maps)
+        self.map_status = QLabel()
+        self.map_status.setObjectName("hint")
+        self.map_status.setWordWrap(True)
+        self.map_status.hide()
+        layout.addWidget(self.map_status)
+        tree = QgsProject.instance().layerTreeRoot()
+        for signal in (tree.visibilityChanged, tree.addedChildren, tree.removedChildren):
+            signal.connect(self._sync_basemap_control)
+        self._sync_basemap_control()
         self.site_toggle = labelled(QPushButton(), "Find or change site", "Wybierz lub zmień lokalizację")
         self.site_toggle.setCheckable(True)
         self.site_toggle.setChecked(True)
@@ -355,17 +377,6 @@ class GroundSurfPlugin(ReportActions):
         self.report_actions.setLayout(report_actions)
         self.report_actions.hide()
         layout.addWidget(self.report_actions)
-        self.map_button = labelled(QToolButton(), "Map layers", "Warstwy mapy")
-        self.map_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.map_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.map_menu = QMenu(self.map_button)
-        self.map_button.setMenu(self.map_menu)
-        layout.addWidget(self.map_button)
-        self.map_status = QLabel()
-        self.map_status.setObjectName("hint")
-        self.map_status.setWordWrap(True)
-        self.map_status.hide()
-        layout.addWidget(self.map_status)
         self.context_label = QLabel()
         self.context_label.setObjectName("hint")
         self.context_label.setWordWrap(True)
@@ -406,7 +417,26 @@ class GroundSurfPlugin(ReportActions):
         try:
             self.basemap.add()
         except ValueError as exc:
-            self.progress.setText(str(exc))
+            self.map_status.setText(str(exc))
+            self.map_status.show()
+        self._sync_basemap_control()
+
+    def _toggle_basemap(self, visible):
+        if visible:
+            self.add_basemap()
+        else:
+            for node in QgsProject.instance().layerTreeRoot().findLayers():
+                if node.layer() and is_osm(node.layer()):
+                    node.setItemVisibilityChecked(False)
+            self.map_status.hide()
+        self._sync_basemap_control()
+
+    def _sync_basemap_control(self, *unused):
+        visible = any(node.isVisible() and node.layer() and is_osm(node.layer())
+                      for node in QgsProject.instance().layerTreeRoot().findLayers())
+        blocked = self.osm_toggle.blockSignals(True)
+        self.osm_toggle.setChecked(visible)
+        self.osm_toggle.blockSignals(blocked)
 
     def _map_unavailable(self):
         self.map_status.setText(self.tr2("Some map tiles are unavailable. Report generation can still continue.",
@@ -456,7 +486,6 @@ class GroundSurfPlugin(ReportActions):
         language = self.language.currentText()
         self.context_label.setText(country + " · " + language)
         self.map_menu.clear()
-        self.map_menu.addAction("OpenStreetMap", self.add_basemap)
         self.map_menu.addAction(self.tr2("Geology and other layers", "Geologia i inne warstwy"), self.add_overlay)
         self.map_menu.addAction(self.tr2("Zoom to site", "Powiększ do lokalizacji"), self.zoom_site)
         self.tools_menu.clear()
