@@ -55,7 +55,7 @@ QT_QPA_PLATFORM=offscreen /usr/bin/python3 tools/smoke_qgis_handoff.py
 python3 tools/build_release.py
 ```
 
-With a saved report, `tools/check_stored_report.py REPORT.json` checks the reader, JSON, PDF, sharing UI and manifest. Its optional `--live` flag contacts the Polish parcel and map services. The install package contains the plugin directory only. The QGIS metadata declares a minimum of 3.28. Version 0.5.0 was tested on Debian 13 with QGIS 3.40.6 Bratislava / Qt 5. The earlier report workflow was tested on Ubuntu 24.04.5 with QGIS 3.34.4 Prizren. Windows, macOS and Qt 6 are not verified for this release.
+With a saved report, `tools/check_stored_report.py REPORT.json` checks the reader, JSON, PDF, sharing UI and manifest. Its optional `--live` flag contacts the Polish parcel and map services. `tools/verify_package.py dist/GroundSurf-QGIS-0.5.0.zip` checks the actual package against source and runs five native workflow scripts from the extracted ZIP. The install package contains the plugin directory only. The QGIS metadata declares a minimum of 3.28. Version 0.5.0 was tested visibly on Debian 13 with QGIS 3.40.6 Bratislava / Qt 5 and with offscreen package tests on Ubuntu 24.04 with QGIS 3.34.4 Prizren. Windows, macOS, QGIS 3.28 and Qt 6 are not verified for this release.
 
 See [feature parity](PARITY.md) and [release verification](VERIFICATION.md). Version 0.5.0 verification is in [the release notes](docs/RELEASE-0.5.0.md). Public catalogue submission remains with the maintainer.
 

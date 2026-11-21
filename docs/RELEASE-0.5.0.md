@@ -34,7 +34,9 @@ All 34 pure-Python core/stream tests pass. The following QGIS scripts pass on De
 
 The stored-report checker used `--allow-missing-manifest-runtime`: this test environment has neither QtQml nor QtWebKit. The existing manifest exporter returns its expected dependency error. Full JSON and PDF remain available. Manifest parity was previously verified in the 0.3.0 acceptance; it was not reverified here. The optional real ParaView exporter test was not run because that separate plugin is not installed; its interface handoff fixture passed.
 
-Python compilation and whitespace checks pass. ZIP contents are checked against source and installed files.
+The exact delivered ZIP also passed all 34 core/stream tests and all five native workflow scripts on Ubuntu 24.04 / QGIS 3.34.4 Prizren. These Ubuntu checks ran offscreen from a separate review checkout and temporary extracted package. The user's running QGIS process, default profile and existing checkouts were left untouched.
+
+Python compilation and whitespace checks pass. `tools/verify_package.py` confirms that every ZIP entry matches source, that the licence and version are present, and that all five native workflow scripts import the extracted ZIP. Every final installed plugin file was also compared byte for byte with the ZIP in the visible Debian desktop.
 
 ## Visible installation and integration
 
@@ -48,7 +50,7 @@ The live drawn-polygon request completed with HTTP 200 after **35.2 seconds**, r
 
 The visible cancel action kept the same polygon; retry completed successfully. The larger reader showed 30 / 30 records; filtering by II_771_1 produced 1 / 30. A live Polish follow-up answered that the measurement was from the nearby monitoring station, not the selected parcel. GET `/api/reports/REP-PL-MWQ3Q89Y` returned all 18 server fields unchanged relative to the plugin record. The plugin only added its selected boundary and origin metadata.
 
-Two final presentation corrections followed this run: Enter in the question field no longer activates a navigation button, and safe bold markup in answers is formatted instead of showing asterisks. The final ZIP is rechecked with the same stored report and isolated package tests. No new analysis is needed to open its other views.
+Two final presentation corrections followed this run: Enter in the question field no longer activates a navigation button, and safe bold markup in answers is formatted instead of showing asterisks. The final ZIP passed the isolated package tests, was reinstalled in the visible QGIS desktop and reopened the same stored report without another analysis. The larger reader displayed the Polish groundwater findings, all 30 records and the 1 / 30 station filter. Its map action resolved the genuine PIG-PIB monitoring-station position and displayed one source point on OpenStreetMap, about 2.92 km from the selected site.
 
 ## Install or upgrade
 
@@ -59,7 +61,7 @@ Two final presentation corrections followed this run: Enter in the question fiel
 
 ## Remaining coverage and publication
 
-- The new release was tested on Debian 13 / QGIS 3.40.6 / Qt 5. The earlier 0.3.0 workflow was tested on Ubuntu 24.04.5 / QGIS 3.34.4. The Ubuntu device was offline during this update; Windows, macOS, Qt 6 and minimum QGIS 3.28 remain unverified.
+- The new release was tested visibly on Debian 13 / QGIS 3.40.6 / Qt 5 and with offscreen native package tests on Ubuntu 24.04 / QGIS 3.34.4. The earlier 0.3.0 workflow also had a visible Ubuntu acceptance. Windows, macOS, Qt 6 and minimum QGIS 3.28 remain unverified for 0.5.0.
 - Country-specific narrative and mapping coverage remain as described in `PARITY.md`. This interface update does not claim a fresh complete audit of every backend country adapter.
 - New reports and provider maps require internet access. Public Photon/OSM capacity and national provider availability vary. No bulk tile fetching, new hosted service or geothermal dependency was added.
 - GPL-2.0-or-later applies to the plugin and bundled exporter only. The hosted service and provider datasets remain outside that grant. Copyright and existing notices are retained. Package email and homepage use the maintainer's previously confirmed choices.
