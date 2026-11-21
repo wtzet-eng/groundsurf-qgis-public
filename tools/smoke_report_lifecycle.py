@@ -3,12 +3,15 @@ import json
 import sys
 import threading
 import time
+from unittest.mock import patch
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from smoke_qgis_network import FakeIface, FakeSettings, until
 from qgis.core import QgsApplication,QgsCoordinateReferenceSystem,QgsGeometry
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtTest import QTest
 from groundsurf_qgis import actions,plugin as mod
 
 REPORT = {"id":"REP-DE-QA123","language":"pl","country_code":"DE",
@@ -84,6 +87,13 @@ def main():
         assert plugin.reader.list.count()==24
         plugin.reader.search.setText("doc-23")
         assert plugin.reader.list.count()==1 and "doc-23" in plugin.reader.detail.toPlainText()
+        plugin.reader.tabs.setCurrentIndex(1)
+        plugin.reader.question.setText("Pytanie testowe")
+        plugin.reader.question.setFocus()
+        with patch.object(plugin,"service") as service:
+            QTest.keyClick(plugin.reader.question,Qt.Key.Key_Return)
+            assert service.call_count == 1
+            assert plugin.reader.tabs.currentIndex() == 1, "Enter must not change report view"
         plugin.lookup_at({"country":"DE","lat":52,"lon":14})
         until(lambda: not plugin.jobs)
         assert "SOURCE_UNAVAILABLE" in plugin.progress.text()

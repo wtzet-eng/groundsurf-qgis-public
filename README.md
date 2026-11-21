@@ -1,6 +1,6 @@
-# GroundSurf for QGIS 0.3.2
+# GroundSurf for QGIS 0.5.0
 
-GroundSurf is an independent, non-commercial online service. This experimental QGIS 3 plugin uses the same hosted evidence engine as the website.
+GroundSurf is an independent, non-commercial online service. This QGIS 3 plugin uses the same hosted evidence engine as the website.
 
 ## Videos and companion plugins
 
@@ -11,24 +11,36 @@ GroundSurf is an independent, non-commercial online service. This experimental Q
 ## Install or upgrade
 
 1. Open **Plugins → Manage and Install Plugins → Install from ZIP**.
-2. Select **GroundSurf-QGIS-0.3.2.zip**. Enable **GroundSurf – Site Intelligence** in the Installed tab.
+2. Select **GroundSurf-QGIS-0.5.0.zip**. Enable **GroundSurf – Site Intelligence** in the Installed tab.
 3. Open **Plugins → GroundSurf**. If an older dock remains open after upgrading, restart QGIS. Existing project layers and the explicit report-language preference are retained.
 
 ## Generate your first report
 
-Search for an address, choose a result and check its location on the map. For Poland the report language defaults to Polski. A cross marks the address. Use an official parcel, a selected polygon feature or **Narysuj granicę**. Click the corners, then double-click the final corner. Choose **Generuj raport GroundSurf**. The site outline stays on the map. The form folds away and the report appears in the dock.
+1. Open **Plugins → GroundSurf**. An empty project gets an OpenStreetMap background automatically.
+2. Type an address. Suggestions appear after a short pause. Choose a result to zoom to it. The site country and report language follow the address; Poland defaults to Polish.
+3. A precise address starts an official parcel lookup where supported. Check the highlighted boundary. Otherwise choose **Pick parcel**, **Draw boundary**, or the explicitly labelled **50 m radius**. To draw, click the corners and double-click the final corner. **More → Use selected polygon** imports one selected QGIS polygon.
+4. Click **Generate GroundSurf report**. The outline stays visible while evidence arrives. The form folds away and a groundwater-first overview appears in the dock.
+5. Choose **Read full report** for the larger internal reader. **Interpretation** and **Evidence** are the two main views. Search every evidence record, inspect sources, ask a question, or use **Save / export**. Checks, history, terrain, local Geotech tools, research and full JSON remain under **More detail**.
 
-**Wybór lokalizacji** expands the form again. Under **Mapy i zapisane raporty**, use the parcel tools, address-radius screening, Polish map layers or a saved report. The map-layer action contacts the named map provider when you choose a layer. Existing project layers keep their original styles.
+**Find or change site** reopens the form. **Map layers** offers OpenStreetMap, country-specific overlays and zooming to the site. **Map evidence** plots supported source positions and links map selection to the evidence reader. A distance alone does not locate an observation.
 
-Open **Raport szczegółowy** to search every returned evidence record, view sources and limitations, inspect the stored record, ask a question, or save JSON or PDF. **Pokaż dane na mapie** maps supported source positions. A distance from the site alone cannot locate an observation. The Polish monitoring mapper looks up the recorded station ID and checks its monitoring reference. Follow-up questions use the active report. Source pages, copying a share link and copying an embed are explicit actions.
+**Country, language and defaults** lets you override the country or language and switch off automatic maps or suggestions. A remembered language choice takes priority over the site country. **Automatic** returns to the country language. English and Polish cover the main controls; other report languages use the existing service.
+
+**More** contains recent reports, reopening a website report or saved JSON, selected polygon import and optional 3D handoff. Source pages, feedback and sharing remain explicit actions. Opening another report view reuses the existing record.
+
+GroundSurf **Site Intelligence** remains separate from **GroundSurf Geothermal**. This package adds no geothermal modelling interface, dependency or shared project storage. Existing optional links to companion tools remain optional.
 
 ## Data and privacy
 
-Address searches go to Photon (OpenStreetMap contributors). The GroundSurf Cloud Run service receives the selected geometry, country, area, language and any selected parcel ID. QGIS project files and other feature attributes are excluded. The service can store an analysis under its report ID. A share action checks durable storage before copying a link. A person with that link can read the report.
+Typed address searches go to Photon after a 900 ms pause, with a minimum of three characters, an in-memory cache and a request interval. Turn suggestions off to search only with **Find** or Enter. Choosing a precise address can send its position to the GroundSurf parcel service. Address points are not parcel boundaries. The GroundSurf Cloud Run service receives the selected geometry, country, area, language and any selected parcel ID. QGIS project files and other feature attributes are excluded. The service can store an analysis under its report ID. A share action checks durable storage before copying a link. A person with that link can read the report.
 
 The plugin keeps the 20 most recent generated records in the active QGIS profile under `groundsurf_reports`. Manage those JSON files through **Settings → User Profiles → Open Active Profile Folder**. The portable full report includes the server record plus the submitted boundary and its QGIS origin. The evidence manifest is a separate, curated export. It uses the web application's version 1.2.0 exporter. Offline manifest generation requires QtQml or QtWebKit. New reports, parcel lookups, AI questions and sharing require internet access.
 
 The drawing and import tools accept one valid polygon without holes and up to 1,000 vertices. Groundwater observations retain the monitoring location and date. Well depth and local water level are separate quantities. Missing coverage remains unknown.
+
+OpenStreetMap uses QGIS’s native XYZ provider and HTTP tile cache. Only visible map tiles are requested. There is no bulk download or offline tile pack. Attribution stays on the canvas while the OSM layer is visible, including after closing or unloading the plugin. Existing project layers, styles, extent and CRS are preserved. A new empty project uses Web Mercator. Map rendering and report requests run independently.
+
+Provider policies: [OpenStreetMap tiles](https://operations.osmfoundation.org/policies/tiles/) · [Photon](https://github.com/komoot/photon). Provider availability and capacity can vary. Basemap downloads expose the viewed map extent to the tile provider. The advanced `GroundSurfQGIS/osm_tiles` setting accepts an HTTPS OSM-compatible XYZ endpoint; it must permit the displayed attribution and normal interactive use.
 
 ## Build and verify
 
@@ -38,12 +50,14 @@ python3 -m compileall -q groundsurf_qgis
 QT_QPA_PLATFORM=offscreen /usr/bin/python3 tools/smoke_qgis_ui.py
 QT_QPA_PLATFORM=offscreen /usr/bin/python3 tools/smoke_qgis_network.py
 QT_QPA_PLATFORM=offscreen /usr/bin/python3 tools/smoke_report_lifecycle.py
+QT_QPA_PLATFORM=offscreen /usr/bin/python3 tools/smoke_map_defaults.py
+QT_QPA_PLATFORM=offscreen /usr/bin/python3 tools/smoke_qgis_handoff.py
 python3 tools/build_release.py
 ```
 
-With a saved report, `tools/check_stored_report.py REPORT.json` checks the reader, JSON, PDF, sharing UI and manifest. Its optional `--live` flag contacts the Polish parcel and map services. The install package contains the plugin directory only. The QGIS metadata declares a minimum of 3.28. Actual desktop testing covered Ubuntu 24.04.5 LTS with QGIS 3.34.4 Prizren.
+With a saved report, `tools/check_stored_report.py REPORT.json` checks the reader, JSON, PDF, sharing UI and manifest. Its optional `--live` flag contacts the Polish parcel and map services. `tools/verify_package.py dist/GroundSurf-QGIS-0.5.0.zip` checks the actual package against source and runs five native workflow scripts from the extracted ZIP. The install package contains the plugin directory only. The QGIS metadata declares a minimum of 3.28. Version 0.5.0 was tested visibly on Debian 13 with QGIS 3.40.6 Bratislava / Qt 5 and with offscreen package tests on Ubuntu 24.04 with QGIS 3.34.4 Prizren. Windows, macOS, QGIS 3.28 and Qt 6 are not verified for this release.
 
-See [feature parity](PARITY.md) and [release verification](VERIFICATION.md). The maintainer owns the licensing, public-source and catalogue-submission decisions.
+See [feature parity](PARITY.md) and [release verification](VERIFICATION.md). Version 0.5.0 verification is in [the release notes](docs/RELEASE-0.5.0.md). Public catalogue submission remains with the maintainer.
 
 ## Plugin licence
 
