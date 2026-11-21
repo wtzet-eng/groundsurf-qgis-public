@@ -98,7 +98,8 @@ class GeotechPanel(QWidget):
 
     def refresh(self):
         t = self.t
-        number = lambda x: self.locale.toString(float(x), 'f', 2)
+        def number(x):
+            return self.locale.toString(float(x), 'f', 2)
         excavation = self.depth.value()
         lines = [t("Depths are relative to local ground at each source. Nearby wells may have different terrain elevations, aquifers and measurement dates.",
                    "Głębokości odniesiono do powierzchni terenu w miejscu każdego źródła. Rzędne terenu, poziomy wodonośne i daty pomiarów mogą się różnić.")]
